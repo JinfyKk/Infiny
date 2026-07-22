@@ -1,30 +1,34 @@
 # 🚀 Infiny
 
-> Uma interface desktop moderna pro Claude Code. Menos terminal, mais produtividade.
+&gt; Uma interface desktop moderna para o Claude Code. Menos terminal, mais produtividade.
 
-O Infiny é uma interface desktop que deixa a experiência com o Claude Code mais simples, organizada e intuitiva.
+O Infiny é uma ferramenta desktop desenvolvida para aprimorar a experiência com o Claude Code, tornando-a mais intuitiva e organizada.
 
-Aqui você pode gerenciar projetos, conversar com a IA e acompanhar os arquivos gerados, tudo em um só lugar.
+Com esta aplicação, você pode gerenciar seus projetos, interagir com a IA e acompanhar os arquivos criados em um só lugar, diminuindo a necessidade de usar o terminal constantemente.
 
----
-
-## ✨ O que já tem
-
-- 💬 Chat integrado
-- 📁 Gerenciamento de projetos
-- 🧠 Histórico das conversas
-- 🤖 Seleção de modelos
-- ⚙️ Controle de esforço (Effort)
-- 🖼️ Upload de imagens
-- 📄 Preview de arquivos gerados
-- 🎨 Interface moderna inspirada em apps de IA
-- ⚡ Rápido e leve
+O objetivo é apresentar um fluxo de desenvolvimento robusto de uma maneira mais visual, fácil de usar e acessível.
 
 ---
 
-# 🛠️ Tecnologias
+ ✨ Funcionalidades
 
-Esse projeto foi feito usando:
+O Infiny atualmente oferece:
+
+- 💬 Um chat integrado com o Claude Code
+- 📁 Ferramentas para gerenciar projetos
+- 🧠 Um histórico das suas conversas
+- 🤖 Possibilidade de escolher entre diferentes modelos de IA
+- ⚙️ Controle sobre o nível de esforço (Effort)
+- 🖼️ Capacidade de enviar imagens para contexto
+- 📄 Visualização direta de arquivos gerados
+- 🎨 Uma interface atual, inspirada em aplicações de IA populares
+- ⚡ Uma aplicação rápida e com bom desempenho
+
+---
+
+ 🛠️ Tecnologias utilizadas
+
+Para o desenvolvimento deste projeto, foram empregadas as seguintes tecnologias:
 
 - Electron
 - React
@@ -36,27 +40,27 @@ Esse projeto foi feito usando:
 
 ---
 
-# 📦 Instalação
+ 📦 Instalação
 
-Clone o repositório:
+Comece clonando o repositório:
 
 ```bash
 git clone https://github.com/JinfyKk/Infiny.git
 ```
 
-Entre na pasta:
+Navegue até a pasta do projeto:
 
 ```bash
 cd Infiny
 ```
 
-Instale as dependências:
+Instale todas as dependências necessárias:
 
 ```bash
 npm install
 ```
 
-Inicie o projeto:
+Execute o projeto em modo de desenvolvimento:
 
 ```bash
 npm run dev
@@ -64,9 +68,9 @@ npm run dev
 
 ---
 
-# 🏗️ Build
+ 🏗️ Build de produção
 
-Pra gerar a versão de produção:
+Para criar uma versão otimizada para uso final:
 
 ```bash
 npm run build
@@ -74,51 +78,48 @@ npm run build
 
 ---
 
-# 🎯 Objetivo
+ 🎯 Objetivo do projeto
 
-O Infiny não quer reinventar o Claude Code.
+O Infiny não foi concebido para substituir o Claude Code.
 
-A ideia é só deixar a experiência muito mais agradável.
-
----
-
-# 🗺️ Roadmap
-
-Ainda tem bastante coisa que quero adicionar:
-
-- [ ] Git integrado
-- [ ] Melhor gerenciamento de arquivos
-- [ ] Múltiplas conversas
-- [ ] Plugins
-- [ ] Mais personalização
-- [ ] Atualizações automáticas
+A intenção é fornecer uma camada visual que aprimore a usabilidade, a organização e a eficiência, sem comprometer a potência da ferramenta original.
 
 ---
 
-# 🤝 Contribuindo
+ 🗺️ Roadmap
 
-Achou algum bug?
+Este projeto está em constante desenvolvimento. Algumas melhorias que estão planejadas incluem:
 
-Tem uma ideia legal?
-
-Abre uma Issue ou manda um Pull Request.
-
-Toda ajuda é bem-vinda.
-
----
-
-# 📄 Licença
-
-Esse projeto está sob a licença MIT.
-
-Pode usar, modificar e contribuir à vontade.
+- [ ] Integração com Git
+- [ ] Um melhor sistema para gerenciar e navegar arquivos
+- [ ] Suporte para manter várias conversas ativas ao mesmo tempo
+- [ ] Um sistema de plugins
+- [ ] Mais opções para personalizar a interface
+- [ ] Implementação de atualizações automáticas
 
 ---
 
-<div align="center">
+ 🤝 Contribuindo
 
-### Feito com paciencia e raiva
+Identificou algum problema ou tem uma ideia?
 
-- Jinfy
+Você pode abrir uma Issue ou submeter um Pull Request.
 
-</div>
+Qualquer tipo de contribuição, sugestão ou feedback é muito bem-vindo.
+
+---
+
+ 📄 Licença
+
+Este projeto está sob a licença MIT.
+
+Você tem liberdade para utilizá-lo, alterá-lo e colaborar com ele.
+
+---
+
+
+
+# Feito com odio.
+
+Jinfy
+
