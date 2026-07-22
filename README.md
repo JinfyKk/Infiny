@@ -1,6 +1,6 @@
 # 🚀 Infiny
 
-&gt; Uma interface desktop moderna para o Claude Code. Menos terminal, mais produtividade.
+> Uma interface desktop moderna para o Claude Code. Menos terminal, mais produtividade.
 
 O Infiny é uma ferramenta desktop desenvolvida para aprimorar a experiência com o Claude Code, tornando-a mais intuitiva e organizada.
 
@@ -10,7 +10,7 @@ O objetivo é apresentar um fluxo de desenvolvimento robusto de uma maneira mais
 
 ---
 
- ✨ Funcionalidades
+## ✨ Funcionalidades
 
 O Infiny atualmente oferece:
 
@@ -26,7 +26,7 @@ O Infiny atualmente oferece:
 
 ---
 
- 🛠️ Tecnologias utilizadas
+## 🛠️ Tecnologias utilizadas
 
 Para o desenvolvimento deste projeto, foram empregadas as seguintes tecnologias:
 
@@ -40,7 +40,7 @@ Para o desenvolvimento deste projeto, foram empregadas as seguintes tecnologias:
 
 ---
 
- 📦 Instalação
+## 📦 Instalação
 
 Comece clonando o repositório:
 
@@ -68,7 +68,7 @@ npm run dev
 
 ---
 
- 🏗️ Build de produção
+## 🏗️ Build de produção
 
 Para criar uma versão otimizada para uso final:
 
@@ -78,7 +78,7 @@ npm run build
 
 ---
 
- 🎯 Objetivo do projeto
+## 🎯 Objetivo do projeto
 
 O Infiny não foi concebido para substituir o Claude Code.
 
@@ -86,7 +86,7 @@ A intenção é fornecer uma camada visual que aprimore a usabilidade, a organiz
 
 ---
 
- 🗺️ Roadmap
+## 🗺️ Roadmap
 
 Este projeto está em constante desenvolvimento. Algumas melhorias que estão planejadas incluem:
 
@@ -99,7 +99,7 @@ Este projeto está em constante desenvolvimento. Algumas melhorias que estão pl
 
 ---
 
- 🤝 Contribuindo
+## 🤝 Contribuindo
 
 Identificou algum problema ou tem uma ideia?
 
@@ -109,7 +109,7 @@ Qualquer tipo de contribuição, sugestão ou feedback é muito bem-vindo.
 
 ---
 
- 📄 Licença
+## 📄 Licença
 
 Este projeto está sob a licença MIT.
 
@@ -117,9 +117,10 @@ Você tem liberdade para utilizá-lo, alterá-lo e colaborar com ele.
 
 ---
 
+<div align="center">
 
+### Feito com odio.
 
-# Feito com odio.
+**Jinfy**
 
-Jinfy
-
+</div>
