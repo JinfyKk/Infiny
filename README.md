@@ -119,8 +119,8 @@ Pode usar, modificar e contribuir à vontade.
 
 <div align="center">
 
-### Feito porque terminal é legal...
+### Feito com paciencia e raiva
 
-### ...até deixar de ser. 😅
+### - Jinfy
 
 </div>
