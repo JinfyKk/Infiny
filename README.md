@@ -120,16 +120,6 @@ npm run preview
 
 ---
 
-## ⌨️ Atalhos rápidos
-
-| Atalho | Ação |
-|--------|------|
-| `Enter` | Enviar mensagem 📤 |
-| `Shift + Enter` | Nova linha ⏎ |
-| `Ctrl/Cmd + K` | Command palette *(em breve)* 🎪 |
-
----
-
 ## 💾 Onde ficam seus dados
 
 | OS | Pasta |
@@ -168,7 +158,7 @@ Achou um bug? Tem uma ideia massa? **Abre uma issue ou manda PR!** Toda ajuda é
 
 <div align="center">
 
-**Feito com ☕, 🎧 e muito Claude Code**
+**Feito com 🎵 e 😫**
 
 ⭐ **Deixa uma star se curtiu!** Ajuda muito 💖
 
