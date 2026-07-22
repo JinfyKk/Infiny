@@ -1,129 +1,175 @@
-# Infiny
+# Infiny ✨
 
-Interface desktop moderna para Claude Code. Uma GUI bonita e intuitiva que funciona como camada visual sobre o Claude Code existente.
+> **Uma GUI linda e intuitiva pro Claude Code** — sua nova BFF pra codar com IA no desktop 🤝
 
-## Funcionalidades
+---
 
-- **Chat funcionando** - Interface de conversa completa com markdown e syntax highlighting
-- **Integração com Claude Code** - Executa o Claude Code como subprocesso
-- **Escolha de modelos** - Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5
-- **Controle de effort** - Low, Medium, High, Max, XHigh
-- **Upload de imagens** - Drag & drop, paste, anexar (PNG, JPG, WebP)
-- **Arquivos gerados** - Visualização, download, abrir, localizar
-- **Projetos e histórico** - Gerenciar múltiplos projetos com histórico persistente
-- **Busca na Web** - Toggle para ativar web search
-- **Memória entre chats** - Resumo e informações importantes salvas localmente
+⚠️ **Projeto em desenvolvimento ativo — pode ter bugs. Use por sua conta e risco, e abra uma issue se algo quebrar!** 🐛
 
-## Tecnologias
+---
 
-- **Electron** - Desktop app framework
-- **React 18** + **TypeScript** - UI framework
-- **Vite** - Build tool e dev server
-- **Tailwind CSS** - Styling
-- **Zustand** - State management
-- **electron-store** - Persistência local
-- **react-markdown** + **rehype-highlight** - Renderização de markdown
+## 🚀 O que é isso?
 
-## Estrutura do Projeto
+O **Infiny** é uma interface desktop moderna (Electron + React) que abraça o **Claude Code** num visual liquid glass *dark mode* de cair o queixo. Nada de terminal feio — agora você tem chat bonito, painel de arquivos, seletor de modelo, controle de *effort* e muito mais. Tudo persistido localmente, zero nuvem, 100% seu. 🔒
+
+---
+
+## ✨ Features que brilham
+
+| Feature | Status | Detalhes |
+|---------|--------|----------|
+| 💬 **Chat completo** | ✅ | Markdown, syntax highlighting, cópia de código, streaming visual |
+| 🧠 **Modelos Claude** | ✅ | Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5 — troca na hora |
+| ⚡ **Effort control** | ✅ | Low → XHigh, você manda |
+| 🖼️ **Upload de imagens** | ✅ | Drag & drop, paste (Ctrl+V), file picker — PNG, JPG, WebP |
+| 📁 **Arquivos gerados** | ✅ | Preview, download, abrir no editor, revelar na pasta |
+| 📂 **Projetos & histórico** | ✅ | Vários projetos, histórico persistente, busca integrada |
+| 🌐 **Web Search toggle** | ✅ | Liga/desliga busca na web num clique |
+| 🧠 **Memória entre chats** | ✅ | Resumo + info importante salva por projeto |
+
+---
+
+## 🛠️ Stack tecnológica
+
+- ⚡ **Electron** — Desktop framework
+- ⚛️ **React 18** + **TypeScript** — UI tipada e performática
+- 🏎️ **Vite** — Build instantâneo + HMR
+- 🎨 **Tailwind CSS** — Estilos utilitários + design system *liquid glass*
+- 🐻 **Zustand** — State management simples e leve
+- 💾 **electron-store** — Persistência local (zero DB, zero nuvem)
+- 📝 **react-markdown** + **rehype-highlight** — Render rica de código
+
+---
+
+## 📁 Estrutura do projeto
 
 ```
 infiny/
 ├── src/
 │   ├── main/
-│   │   ├── index.ts      # Electron main process
-│   │   └── preload.ts    # Preload script (IPC bridge)
+│   │   ├── index.ts      # Electron main process 🖥️
+│   │   └── preload.ts    # IPC bridge segura 🔗
 │   ├── components/
-│   │   ├── ui/           # Componentes base (Button, Input, Select, etc)
-│   │   ├── Sidebar.tsx   # Barra lateral (projetos, chats)
-│   │   ├── ChatArea.tsx  # Área central de chat
-│   │   ├── Message.tsx   # Componente de mensagem
-│   │   ├── FilesPanel.tsx # Painel de arquivos gerados
+│   │   ├── ui/           # Botões, Inputs, Selects, Dropdowns...
+│   │   ├── Sidebar.tsx   # Projetos & chats 📋
+│   │   ├── ChatArea.tsx  # Onde a mágica acontece ✨
+│   │   ├── Message.tsx   # Bolhas de mensagem bonitinhas 💬
+│   │   ├── FilesPanel.tsx # Painel lateral de arquivos 📎
 │   │   ├── ModelSelector.tsx
 │   │   └── EffortSelector.tsx
 │   ├── store/
-│   │   └── infinyStore.ts # Zustand store com persistência
-│   ├── lib/
-│   │   └── utils.ts      # Utilitários
-│   ├── App.tsx           # Componente principal
-│   ├── main.tsx          # Entry point React
-│   └── index.css         # Tailwind + estilos customizados
+│   │   └── infinyStore.ts # Zustand + persist 🧠
+│   ├── lib/utils.ts      # Helpers úteis 🛠️
+│   ├── App.tsx           # Root component 🌳
+│   ├── main.tsx          # Entry point React ⚛️
+│   └── index.css         # Tailwind + custom liquid glass 🎨
 ├── index.html
 ├── package.json
-├── tsconfig.json
-├── tsconfig.main.json
-├── tsconfig.node.json
+├── tsconfig.json (+ node/main)
 ├── vite.config.ts
 ├── tailwind.config.js
 └── postcss.config.js
 ```
 
-## Como executar
+---
 
-### Desenvolvimento
+## ▶️ Como rodar
+
+### Dev mode (hot reload 🔥)
 
 ```bash
-# Instalar dependências
+# 1. Instala as deps
 npm install
 
-# Rodar em modo dev (Vite + Electron)
+# 2. Sobe o Vite + Electron junto
 npm run dev
 ```
 
-### Build de produção
+### Build de produção 📦
 
 ```bash
-# Build completo
+# Build completo (renderer + main)
 npm run build
 
 # Preview do build
 npm run preview
 ```
 
-## Scripts disponíveis
+### Scripts úteis
 
-| Script | Descrição |
+| Script | O que faz |
 |--------|-----------|
-| `npm run dev` | Inicia Vite dev server + Electron com hot reload |
-| `npm run dev:renderer` | Apenas Vite dev server |
-| `npm run dev:main` | Compila main process em watch mode |
-| `npm run build` | Build de produção (renderer + main) |
-| `npm run build:renderer` | Build apenas do frontend (Vite) |
-| `npm run build:main` | Build apenas do main process (tsc) |
-| `npm run preview` | Preview do build de produção |
-| `npm run start` | Inicia app buildado |
-| `npm run lint` | ESLint |
+| `npm run dev` | Dev server completo (Vite + Electron) 🚀 |
+| `npm run dev:renderer` | Só o Vite (pra testar no browser) 🌐 |
+| `npm run dev:main` | Watch mode do main process 👀 |
+| `npm run build` | Build production-ready 📦 |
+| `npm run build:renderer` | Build só frontend |
+| `npm run build:main` | Compila main (tsc) |
+| `npm run start` | Roda o app buildado ▶️ |
+| `npm run lint` | ESLint pra manter limpo ✨ |
 
-## Como funciona a integração com Claude Code
+---
 
-O app usa o `electron-store` para persistência local (não precisa de banco de dados) e executa o CLI do Claude Code como subprocesso:
+## 🔌 Como funciona a integração
 
-1. Usuário seleciona/cria um projeto (pasta)
-2. Ao iniciar chat, o app executa `claude --model <model> --effort <effort>` no diretório do projeto
-3. Mensagens são enviadas via stdin do processo
-4. Respostas vêm via stdout/stderr
-5. Arquivos gerados são detectados e exibidos no painel lateral
+1. **Você escolhe/cria um projeto** (qualquer pasta do seu PC) 📂
+2. **Infiny sobe o `claude` como subprocesso** na pasta do projeto com os flags certos (`--model`, `--effort`, `--web-search`) ⚙️
+3. **Mensagens vão via stdin**, respostas vêm via stdout/stderr 📥📤
+4. **Arquivos criados** são detectados e aparecem no painel lateral automaticamente 🎯
+5. **Tudo persiste local** via `electron-store` — seus dados, suas regras 🔐
 
-## Atalhos de teclado
+---
+
+## ⌨️ Atalhos rápidos
 
 | Atalho | Ação |
 |--------|------|
-| `Enter` | Enviar mensagem |
-| `Shift + Enter` | Nova linha |
-| `Ctrl/Cmd + K` | Command palette (planejado) |
+| `Enter` | Enviar mensagem 📤 |
+| `Shift + Enter` | Nova linha ⏎ |
+| `Ctrl/Cmd + K` | Command palette *(em breve)* 🎪 |
 
-## Configuração
+---
 
-As configurações são salvas automaticamente em:
-- Windows: `%APPDATA%\infiny-data`
-- macOS: `~/Library/Application Support/infiny-data`
-- Linux: `~/.config/infiny-data`
+## 💾 Onde ficam seus dados
 
-## Requisitos
+| OS | Pasta |
+|----|-------|
+| Windows | `%APPDATA%\infiny-data` |
+| macOS | `~/Library/Application Support/infiny-data` |
+| Linux | `~/.config/infiny-data` |
 
-- Node.js 18+
-- Claude Code CLI instalado e no PATH
-- Windows 10+, macOS 10.15+, ou Linux
+> **Spoiler:** É só um JSON. Pode abrir, editar, backup, mandar pro amigo — é seu! 🤷‍♂️
 
-## Licença
+---
 
-MIT
+## ✅ Requisitos
+
+- Node.js **18+** 📦
+- **Claude Code CLI** instalado e no `PATH` 🤖
+- Windows 10+, macOS 10.15+, ou Linux 🐧
+
+---
+
+## 🤝 Contribuindo
+
+Achou um bug? Tem uma ideia massa? **Abre uma issue ou manda PR!** Toda ajuda é bem-vinda 💚
+
+```bash
+# Fork -> Clone -> Branch -> Code -> Commit -> Push -> PR
+```
+
+---
+
+## ⚖️ Licença
+
+**MIT** — faz o que quiser, só não me processa se der ruim 😉
+
+---
+
+<div align="center">
+
+**Feito com ☕, 🎧 e muito Claude Code**
+
+⭐ **Deixa uma star se curtiu!** Ajuda muito 💖
+
+</div>
