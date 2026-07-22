@@ -80,8 +80,6 @@ O Infiny não quer reinventar o Claude Code.
 
 A ideia é só deixar a experiência muito mais agradável.
 
-Em vez de abrir terminal, decorar comandos e ficar navegando por pasta, você abre o aplicativo e faz tudo por uma interface simples.
-
 ---
 
 # 🗺️ Roadmap
