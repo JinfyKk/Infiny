@@ -34,8 +34,18 @@ export function Dropdown({ trigger, options, onSelect, selectedValue, placeholde
       }
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   const handleOptionClick = (value: string) => {
@@ -73,7 +83,7 @@ export function Dropdown({ trigger, options, onSelect, selectedValue, placeholde
                 'focus:outline-none focus:bg-surfaceHover',
                 option.danger ? 'text-error' : 'text-textPrimary',
                 option.disabled && 'opacity-50 cursor-not-allowed',
-                selectedValue === option.value && 'bg-primary/10 text-primary'
+                selectedValue === option.value && 'bg-primarySoft text-primary'
               )}
             >
               {option.icon && <span className="flex-shrink-0 h-4 w-4">{option.icon}</span>}
@@ -201,7 +211,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, sections }: CommandP
                     className={cn(
                       'w-full px-3 py-2.5 rounded-lg flex items-center gap-3 text-sm transition-colors duration-100',
                       'hover:bg-surfaceHover',
-                      isSelected && 'bg-primary/10 text-primary'
+                      isSelected && 'bg-primarySoft text-primary'
                     )}
                   >
                     {item.icon && <span className="flex-shrink-0 h-4 w-4 text-textMuted">{item.icon}</span>}

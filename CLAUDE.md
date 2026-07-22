@@ -309,3 +309,158 @@ Ao terminar qualquer tarefa, o projeto deve estar:
 - mais fácil de manter do que antes.
 
 Toda alteração deve agregar valor real ao projeto.
+
+---
+
+# Frontend e Design de Produto
+
+Quando trabalhar em interfaces:
+
+Priorize uma experiência visual premium.
+
+A interface deve parecer um produto real, não apenas uma tela funcional.
+
+Considere sempre:
+
+- hierarquia visual;
+- espaçamento;
+- tipografia;
+- contraste;
+- responsividade;
+- acessibilidade;
+- consistência visual;
+- microinterações.
+
+---
+
+# UI/UX
+
+Antes de criar componentes:
+
+Analise:
+
+- qual é o objetivo da tela;
+- qual ação principal o usuário deve realizar;
+- como reduzir fricção;
+- como melhorar a percepção de qualidade.
+
+Evite:
+
+- layouts genéricos;
+- excesso de cards;
+- interfaces parecidas com dashboards antigos;
+- cores aleatórias;
+- sombras exageradas;
+- animações sem propósito.
+
+---
+
+# Design System
+
+Sempre mantenha consistência:
+
+- mesmas escalas de espaçamento;
+- mesma hierarquia de texto;
+- mesmos padrões de componentes;
+- mesmos estados de interação.
+
+Crie componentes reutilizáveis quando houver repetição real.
+
+Não crie abstrações apenas por criar.
+
+---
+
+# Animações
+
+Use animações para melhorar a experiência.
+
+Priorize:
+
+- transições suaves;
+- feedback visual;
+- estados de carregamento;
+- entrada e saída de elementos;
+- microinterações.
+
+Evite:
+
+- animações exageradas;
+- efeitos que prejudicam performance;
+- movimentos sem função.
+
+Prefira animações naturais com sensação física.
+
+---
+
+# Frontend Moderno
+
+Ao criar interfaces modernas considere:
+
+- React + TypeScript quando apropriado;
+- componentes reutilizáveis;
+- gerenciamento de estado simples;
+- CSS/Tailwind organizado;
+- acessibilidade;
+- performance.
+
+Use bibliotecas como Framer Motion apenas quando agregarem valor real.
+
+---
+
+# Qualidade Visual
+
+Antes de finalizar uma interface revise:
+
+- Existe uma identidade visual clara?
+- A hierarquia está evidente?
+- O espaçamento está consistente?
+- A interface funciona em diferentes tamanhos?
+- Os estados vazios, loading e erro existem?
+- A experiência parece profissional?
+
+---
+
+# Interfaces Premium
+
+Quando solicitado um design moderno:
+
+Busque inspiração em produtos de alta qualidade:
+
+- Apple;
+- Linear;
+- Vercel;
+- Raycast;
+- Notion;
+- Stripe.
+
+Não copie estilos.
+
+Entenda os princípios:
+
+- simplicidade;
+- clareza;
+- foco;
+- detalhes bem trabalhados.
+
+---
+
+# Código Frontend
+
+Componentes devem ser:
+
+- pequenos;
+- fáceis de entender;
+- com responsabilidades claras.
+
+Evite:
+
+- componentes gigantes;
+- lógica de negócio misturada com UI;
+- estilos espalhados;
+- estados desnecessários.
+
+Sempre considere:
+
+- performance de renderização;
+- acessibilidade;
+- experiência do usuário.

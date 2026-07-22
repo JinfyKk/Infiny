@@ -4,9 +4,18 @@ import { useStore } from '@/store/infinyStore'
 import { Sidebar } from './components/Sidebar'
 import { ChatArea } from './components/ChatArea'
 import { FilesPanel } from './components/FilesPanel'
+import { ThemeSelector } from '@/theme'
+import { ThemeProvider } from '@/theme'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 
-export function App() {
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.2, ease: 'easeIn' } }
+} as const
+
+function AppContent() {
   const { isSidebarOpen, setSidebarOpen, isFilesPanelOpen, setFilesPanelOpen, currentProject, currentChat } = useStore()
   const [mounted, setMounted] = useState(false)
 
@@ -18,7 +27,14 @@ export function App() {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center">
         <div className="text-center">
-          <Sparkles className="w-16 h-16 mx-auto mb-4 text-primary animate-pulse" />
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="w-16 h-16 mx-auto mb-4 text-primary"
+          >
+            <Sparkles className="w-full h-full animate-pulse" />
+          </motion.div>
           <p className="text-textSecondary">Carregando Infiny...</p>
         </div>
       </div>
@@ -47,22 +63,34 @@ export function App() {
             </button>
 
             {currentProject && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.05 }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+              >
                 <FolderOpen className="w-4 h-4 text-textSecondary" />
                 <span className="text-sm font-medium text-textPrimary truncate max-w-[200px]">{currentProject.name}</span>
-              </div>
+              </motion.div>
             )}
 
             {currentChat && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.1 }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+              >
                 <FileText className="w-4 h-4 text-textSecondary" />
                 <span className="text-sm font-medium text-textPrimary truncate max-w-[250px]">{currentChat.title}</span>
-              </div>
+              </motion.div>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setFilesPanelOpen(!isFilesPanelOpen)}
               className={cn(
                 'p-2 rounded-lg transition-colors',
@@ -73,7 +101,8 @@ export function App() {
               aria-label="Arquivos gerados"
             >
               <FileText className="w-5 h-5" />
-            </button>
+            </motion.button>
+            <ThemeSelector />
           </div>
         </header>
 
@@ -90,5 +119,15 @@ export function App() {
         />
       </main>
     </div>
+  )
+}
+
+export function App() {
+  return (
+    <ThemeProvider>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" exit="exit">
+        <AppContent />
+      </motion.div>
+    </ThemeProvider>
   )
 }

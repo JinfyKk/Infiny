@@ -2,7 +2,7 @@ import React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle'
   size?: 'sm' | 'md' | 'lg' | 'icon'
   isLoading?: boolean
 }
@@ -12,10 +12,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed'
 
     const variants = {
-      primary: 'bg-primary text-white hover:bg-primaryHover active:bg-primary/90',
+      primary: 'bg-primary text-white hover:bg-primaryHover active:bg-primaryPressed',
       secondary: 'bg-surfaceHover text-textPrimary hover:bg-borderHover active:bg-border',
       ghost: 'bg-transparent text-textSecondary hover:bg-surfaceHover hover:text-textPrimary active:bg-border',
-      danger: 'bg-error/10 text-error hover:bg-error/20 active:bg-error/30',
+      danger: 'bg-errorSoft text-error hover:bg-errorHover active:bg-errorPressed',
+      subtle: 'bg-primarySoft text-primary hover:bg-primaryHover/20 active:bg-primaryHover/30',
     }
 
     const sizes = {

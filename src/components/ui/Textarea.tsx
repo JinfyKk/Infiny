@@ -25,9 +25,9 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             'w-full px-4 py-3 rounded-lg bg-surface border',
             'text-textPrimary placeholder-textMuted',
             'transition-colors duration-150 resize-y min-h-[100px]',
-            'focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            error ? 'border-error focus:ring-error' : 'border-border hover:border-borderHover',
+            error ? 'border-error focus-visible:ring-error' : 'border-border hover:border-borderHover',
             className
           )}
           aria-invalid={error ? 'true' : 'false'}

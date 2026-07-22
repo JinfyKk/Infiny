@@ -1,10 +1,10 @@
-import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Copy, ExternalLink } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
-import { User, Sparkles } from 'lucide-react'
+import { Sparkles, User } from 'lucide-react'
+import { useToastHelpers } from '@/components/ui/Toast'
 
 interface MessageProps {
   message: {
@@ -110,8 +110,8 @@ export function Message({ message, isStreaming = false }: MessageProps) {
         <div className={cn(
           'px-4 py-3 rounded-2xl',
           isUser
-            ? 'bg-primary/15 text-textPrimary rounded-br-md'
-            : 'bg-surfaceHover text-textPrimary rounded-bl-md'
+            ? 'bg-primary/15 text-text rounded-br-md'
+            : 'bg-surfaceHover text-text rounded-bl-md'
         )}>
           {message.images && message.images.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
@@ -154,25 +154,23 @@ export function Message({ message, isStreaming = false }: MessageProps) {
 }
 
 function CopyButton({ content }: { content: string }) {
-  const [copied, setCopied] = React.useState(false)
+  const { success } = useToastHelpers()
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    success('Copiado', 'Código copiado para a área de transferência')
   }
 
   return (
     <button
       onClick={handleCopy}
       className={cn(
-        'flex items-center gap-1 px-2 py-1 rounded text-textMuted hover:text-textPrimary hover:bg-surfaceHover transition-colors',
-        copied && 'text-success'
+        'flex items-center gap-1 px-2 py-1 rounded text-textMuted hover:text-textPrimary hover:bg-surfaceHover transition-colors'
       )}
-      aria-label={copied ? 'Copiado!' : 'Copiar resposta'}
+      aria-label="Copiar resposta"
     >
       <Copy className="w-3.5 h-3.5" />
-      {copied && <span className="text-xs">Copiado</span>}
+      <span className="text-xs">Copiar</span>
     </button>
   )
 }

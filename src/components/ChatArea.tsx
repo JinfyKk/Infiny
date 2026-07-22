@@ -7,6 +7,19 @@ import { Message } from './Message'
 import { TypingIndicator } from './TypingIndicator'
 import { ModelSelector } from './ModelSelector'
 import { EffortSelector } from './EffortSelector'
+import { ThemeSelector } from '@/theme/ThemeSelector'
+import { motion, AnimatePresence } from 'framer-motion'
+
+const messageVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } },
+  exit: { opacity: 0, y: -20, height: 0, transition: { duration: 0.15, ease: 'easeIn' } }
+} as const
+
+const typingIndicatorVariants = {
+  hidden: { opacity: 0, y: 10, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } }
+} as const
 
 interface ChatAreaProps {
   isFilesPanelOpen: boolean
@@ -142,13 +155,21 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
   if (!currentChat || !currentProject) {
     return (
       <div className="flex-1 flex flex-col bg-background overflow-hidden">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center p-8">
-            <FileText className="w-16 h-16 mx-auto mb-4 text-textMuted" />
-            <h2 className="text-xl font-medium text-textPrimary mb-2">Bem-vindo ao Infiny</h2>
-            <p className="text-textSecondary max-w-md mx-auto">
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-md mx-auto">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <Sparkles className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-2xl font-medium text-text mb-3">Bem-vindo ao Infiny</h2>
+            <p className="text-textSecondary mb-6 leading-relaxed">
               Selecione ou crie um projeto na barra lateral para começar a conversar com o Claude Code.
             </p>
+            <div className="flex items-center justify-center gap-3 text-xs text-textMuted">
+              <kbd className="px-2 py-1 bg-surface border border-border rounded">Ctrl</kbd>
+              <span>+</span>
+              <kbd className="px-2 py-1 bg-surface border border-border rounded">B</kbd>
+              <span>para alternar a barra lateral</span>
+            </div>
           </div>
         </div>
       </div>
@@ -158,45 +179,67 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden relative">
       {/* Top Bar */}
-      <div className="flex items-center justify-between h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
+      <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
             <FolderOpen className="w-4 h-4 text-textSecondary" />
-            <span className="text-sm font-medium text-textPrimary truncate max-w-[200px]">{currentProject.name}</span>
+            <span className="text-sm font-medium text-text truncate max-w-[200px]">{currentProject.name}</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
             <MessageSquare className="w-4 h-4 text-textSecondary" />
-            <span className="text-sm font-medium text-textPrimary truncate max-w-[250px]">{currentChat.title}</span>
+            <span className="text-sm font-medium text-text truncate max-w-[250px]">{currentChat.title}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <ModelSelector
-            model={settings.model}
-            onChange={(model) => updateSettings({ model })}
-            isOpen={showModelSelector}
-            onToggle={() => { setShowModelSelector(!showModelSelector); setShowEffortSelector(false) }}
-          />
-          <EffortSelector
-            effort={settings.effort}
-            onChange={(effort) => updateSettings({ effort })}
-            isOpen={showEffortSelector}
-            onToggle={() => { setShowEffortSelector(!showEffortSelector); setShowModelSelector(false) }}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('text-textSecondary hover:text-textPrimary', settings.webSearch && 'text-primary')}
-            onClick={() => updateSettings({ webSearch: !settings.webSearch })}
-            aria-label={settings.webSearch ? 'Desativar busca na web' : 'Ativar busca na web'}
-          >
-            <Globe className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onToggleFilesPanel} aria-label="Arquivos gerados">
-            <FileText className={cn('w-5 h-5', isFilesPanelOpen && 'text-primary')} />
-          </Button>
+        <div className="flex items-center gap-1">
+          {/* Model Settings Group */}
+          <div className="flex items-center gap-1">
+            <ModelSelector
+              model={settings.model}
+              onChange={(model) => updateSettings({ model })}
+              isOpen={showModelSelector}
+              onToggle={() => { setShowModelSelector(!showModelSelector); setShowEffortSelector(false) }}
+            />
+            <EffortSelector
+              effort={settings.effort}
+              onChange={(effort) => updateSettings({ effort })}
+              isOpen={showEffortSelector}
+              onToggle={() => { setShowEffortSelector(!showEffortSelector); setShowModelSelector(false) }}
+            />
+          </div>
+
+          <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
+
+          {/* Actions Group */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('text-textSecondary hover:text-textPrimary', settings.webSearch && 'text-primary')}
+              onClick={() => updateSettings({ webSearch: !settings.webSearch })}
+              aria-label={settings.webSearch ? 'Desativar busca na web' : 'Ativar busca na web'}
+              title={settings.webSearch ? 'Busca na web ativa' : 'Ativar busca na web'}
+            >
+              <Globe className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleFilesPanel}
+              aria-label={isFilesPanelOpen ? 'Fechar arquivos gerados' : 'Abrir arquivos gerados'}
+              title={isFilesPanelOpen ? 'Fechar painel de arquivos' : 'Arquivos gerados'}
+              className={cn('text-textSecondary hover:text-textPrimary', isFilesPanelOpen && 'text-primary')}
+            >
+              <FileText className="w-5 h-5" />
+            </Button>
+          </div>
+
+          <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
+
+          {/* Theme Group */}
+          <ThemeSelector />
         </div>
-      </div>
+      </header>
 
       {/* Messages Area */}
       <div
@@ -205,12 +248,29 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {currentChat.messages.map((message) => (
-          <Message key={message.id} message={message} isStreaming={message.isStreaming} />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {currentChat.messages.map((message, index) => (
+            <motion.div
+              key={message.id}
+              variants={messageVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              style={{ transitionDelay: `${index * 0.03}s` as const }}
+            >
+              <Message message={message} isStreaming={message.isStreaming} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
         {isClaudeRunning && (
-          <div className="flex items-start gap-3 animate-in slide-up-200">
+          <motion.div
+            variants={typingIndicatorVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="flex items-start gap-3"
+          >
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
@@ -224,7 +284,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div ref={messagesEndRef} />
@@ -273,7 +333,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
               placeholder={isClaudeRunning ? 'Claude está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
               disabled={isClaudeRunning}
               className={cn(
-                'w-full bg-surface border border-border rounded-2xl px-4 py-3 text-textPrimary placeholder-textMuted',
+                'w-full bg-surface border border-border rounded-2xl px-4 py-3 text-text placeholder-textMuted',
                 'focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent',
                 'resize-none transition-all duration-150',
                 'min-h-[48px] max-h-[200px]',
@@ -288,12 +348,12 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
           <div className="flex items-center gap-1">
             <Button
-              variant="ghost"
+              variant={isClaudeRunning ? 'danger' : 'primary'}
               size="icon"
               onClick={isClaudeRunning ? handleStop : handleSend}
               disabled={(!inputValue.trim() && pendingImages.length === 0) || isClaudeRunning}
               aria-label={isClaudeRunning ? 'Parar geração' : 'Enviar mensagem'}
-              className={cn('h-10 w-10 rounded-xl', isClaudeRunning ? 'text-error hover:bg-error/10' : 'text-primary hover:bg-primary/10')}
+              className={cn('h-10 w-10 rounded-xl', isClaudeRunning ? 'text-error hover:bg-error/10' : 'text-white hover:bg-primaryHover')}
             >
               {isClaudeRunning ? <StopCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </Button>
@@ -301,8 +361,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
         </div>
 
         <div className="flex items-center gap-4 mt-2 text-xs text-textMuted">
-          <span>Modelo: <strong className="text-textSecondary">{settings.model.replace('claude-', '').replace(/-/g, ' ')}</strong></span>
-          <span>Effort: <strong className="text-textSecondary capitalize">{settings.effort}</strong></span>
+          <span>Modelo: <strong className="text-text">{settings.model.replace('claude-', '').replace(/-/g, ' ')}</strong></span>
+          <span>Effort: <strong className="text-text capitalize">{settings.effort}</strong></span>
           {settings.webSearch && <span className="text-primary">🌐 Busca na Web ativa</span>}
         </div>
       </div>

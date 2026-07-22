@@ -17,7 +17,21 @@
   }
 
   ::selection {
-    @apply bg-primary/30 text-textPrimary;
+    background-color: var(--primary);
+    opacity: 0.3;
+    color: var(--text);
+  }
+
+  /* Toast colors */
+  :root {
+    --toast-bg-success: var(--success);
+    --toast-border-success: var(--success);
+    --toast-bg-error: var(--error);
+    --toast-border-error: var(--error);
+    --toast-bg-warning: var(--warning);
+    --toast-border-warning: var(--warning);
+    --toast-bg-info: var(--info);
+    --toast-border-info: var(--info);
   }
 
   ::-webkit-scrollbar {
@@ -46,17 +60,33 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* Focus visible polyfill */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
 }
 
 @layer components {
+  /* Glass effect */
   .glass {
     @apply bg-glassBg backdrop-blur-xl border border-glassBorder;
   }
 
   .glass-hover {
-    @apply glass hover:bg-glassBg/90 hover:border-glassBorder/80 transition-all duration-200;
+    background-color: var(--glassBg);
+    opacity: 0.9;
+    backdrop-filter: blur(24px);
+    border-color: var(--glassBorder);
+    opacity: 0.8;
+    transition: all 200ms ease-out;
   }
 
+  /* Button base */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium
            transition-all duration-150 ease-out
@@ -80,6 +110,11 @@
     @apply btn bg-error/10 text-error hover:bg-error/20 active:bg-error/30;
   }
 
+  .btn-subtle {
+    @apply btn bg-primary/10 text-primary hover:bg-primary/15 active:bg-primary/20;
+  }
+
+  /* Input base */
   .input {
     @apply w-full px-4 py-2.5 rounded-lg bg-surface border border-border
            text-textPrimary placeholder-textMuted
@@ -92,6 +127,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0a0a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 
+  /* Sidebar item */
   .sidebar-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-textSecondary
            hover:bg-surfaceHover hover:text-textPrimary
@@ -103,20 +139,26 @@
     @apply bg-primary/10 text-primary border-l-2 border-primary;
   }
 
+  /* Message bubbles */
   .message-bubble {
     @apply max-w-[85%] px-4 py-3 rounded-2xl;
   }
 
   .message-user {
-    @apply message-bubble bg-primary/15 text-textPrimary ml-auto rounded-br-md;
+    background-color: var(--primary);
+    opacity: 0.15;
+    @apply text-textPrimary ml-auto rounded-2xl rounded-br-md;
   }
 
   .message-assistant {
     @apply message-bubble bg-surfaceHover text-textPrimary mr-auto rounded-bl-md;
   }
 
+  /* Code blocks */
   .code-block {
-    @apply relative bg-surface/80 border border-border rounded-xl overflow-hidden font-mono text-sm;
+    background-color: var(--surface);
+    opacity: 0.8;
+    @apply border border-border rounded-xl overflow-hidden font-mono text-sm;
   }
 
   .code-block-header {
@@ -132,6 +174,7 @@
     display: none;
   }
 
+  /* Animations */
   .animate-in {
     animation: fadeIn 200ms ease-out, slideUp 200ms ease-out;
   }
@@ -155,6 +198,7 @@
     animation-delay: calc(var(--delay) * 150ms);
   }
 
+  /* File items */
   .file-item {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surfaceHover transition-colors cursor-pointer;
   }
@@ -163,6 +207,7 @@
     @apply bg-primary/10 text-primary;
   }
 
+  /* Drop zone */
   .drop-zone {
     @apply border-2 border-dashed border-borderHover rounded-xl p-8 text-center
            transition-all duration-200 hover:border-primary/50 hover:bg-primary/5;
@@ -172,6 +217,7 @@
     @apply border-primary bg-primary/10;
   }
 
+  /* Badges */
   .model-badge {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full
            bg-surface border border-border text-sm font-medium text-textSecondary

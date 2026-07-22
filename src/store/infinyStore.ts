@@ -43,6 +43,7 @@ export interface Settings {
   model: string
   effort: 'low' | 'medium' | 'high' | 'max' | 'xhigh'
   webSearch: boolean
+  theme: 'pampas' | 'dark-premium' | 'tech-blue' | 'natural-green' | 'monochrome' | 'futuristic'
 }
 
 interface InfinyState {
@@ -94,7 +95,8 @@ setCurrentChat: (chat: Chat | null) => void
 const DEFAULT_SETTINGS: Settings = {
   model: 'claude-fable-5',
   effort: 'high',
-  webSearch: false
+  webSearch: false,
+  theme: 'pampas',
 }
 
 const MODELS = [
