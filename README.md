@@ -22,14 +22,6 @@ Aqui você pode gerenciar projetos, conversar com a IA e acompanhar os arquivos 
 
 ---
 
-## 🖼️ Preview
-
-> Em breve...
-
-*(coloque alguns prints aqui depois)*
-
----
-
 # 🛠️ Tecnologias
 
 Esse projeto foi feito usando:
