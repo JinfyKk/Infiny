@@ -119,6 +119,6 @@ Pode usar, modificar e contribuir à vontade.
 
 ### Feito com paciencia e raiva
 
-    - Jinfy
+- Jinfy
 
 </div>
