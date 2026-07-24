@@ -270,8 +270,10 @@ export const useStore = create<InfinyState>()(
         const state = get()
         const { currentProject, settings } = state
 
+        console.log('[Renderer] [Pipeline] sendToProvider CALLED', { chatId, messageLength: message.length, imagesCount: images.length, isProviderRunning: state.isProviderRunning })
+
         if (!currentProject) {
-          console.error('[Renderer] Nenhum projeto selecionado')
+          console.error('[Renderer] [Pipeline] sendToProvider FAILED: No current project')
           return
         }
 
@@ -280,23 +282,24 @@ export const useStore = create<InfinyState>()(
         // Iniciar provider se não estiver rodando
         if (!state.isProviderRunning) {
           try {
-            console.log('[Renderer] sendToProvider - Starting provider for project:', currentProject.path)
+            console.log('[Renderer] [Pipeline] sendToProvider - Starting provider for project:', currentProject.path)
             await window.electronAPI?.startProvider(currentProject.path, {
               model: settings.model,
               effort: settings.effort,
               webSearch: settings.webSearch,
             })
+            console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
             // Aguardar um pouco para o provider iniciar
             await new Promise((resolve) => setTimeout(resolve, 500))
           } catch (error) {
-            console.error('[Renderer] sendToProvider - Erro ao iniciar provider:', error)
+            console.error('[Renderer] [Pipeline] sendToProvider - Error starting provider:', error)
             return
           }
         }
 
         // Enviar mensagem
         try {
-          console.log('[Renderer] sendToProvider - Sending message, length:', message.length, 'images:', images.length)
+          console.log('[Renderer] [Pipeline] sendToProvider - Sending message via IPC')
           set({ isProviderRunning: true, providerOutput: '' })
 
           const assistantMessage: ChatMessage = {
@@ -318,10 +321,11 @@ export const useStore = create<InfinyState>()(
           }))
 
           // Enviar para o provider via IPC
+          console.log('[Renderer] [Pipeline] sendToProvider - Calling electronAPI.sendToProvider')
           await window.electronAPI?.sendToProvider(chatId, message, images)
-          console.log('[Renderer] sendToProvider - IPC call completed')
+          console.log('[Renderer] [Pipeline] sendToProvider - IPC call completed')
         } catch (error) {
-          console.error('[Renderer] sendToProvider - Erro ao enviar mensagem:', error)
+          console.error('[Renderer] [Pipeline] sendToProvider - Error sending message:', error)
           set({ isProviderRunning: false })
 
           // Remover mensagem de streaming em caso de erro
@@ -391,7 +395,7 @@ export const useStore = create<InfinyState>()(
 
         // Listener para saída do provider (streaming)
         outputCleanup = window.electronAPI?.onProviderOutput((data: string) => {
-          console.log('[Renderer] onProviderOutput - Received data, length:', data.length)
+          console.log('[Renderer] [Pipeline] onProviderOutput RECEIVED', { dataLength: data.length, dataPreview: data.slice(0, 100) })
           get().appendProviderOutput(data)
 
           // Atualizar a mensagem de streaming
@@ -399,20 +403,23 @@ export const useStore = create<InfinyState>()(
           if (currentChat) {
             const lastMessage = currentChat.messages[currentChat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              console.log('[Renderer] [Pipeline] onProviderOutput - Updating streaming message')
               get().updateMessage(currentChat.id, lastMessage.id, {
                 content: lastMessage.content + data,
               })
+            } else {
+              console.warn('[Renderer] [Pipeline] onProviderOutput - No streaming message to update, lastMessage:', lastMessage?.role, lastMessage?.isStreaming)
             }
           }
         })
 
         errorCleanup = window.electronAPI?.onProviderError((data: string) => {
-          console.error('[Renderer] onProviderError:', data)
+          console.error('[Renderer] [Pipeline] onProviderError RECEIVED:', data)
           get().appendProviderOutput(`\n[Erro: ${data}]`)
         })
 
         exitCleanup = window.electronAPI?.onProviderExit((code: number) => {
-          console.log('[Renderer] onProviderExit - code:', code)
+          console.log('[Renderer] [Pipeline] onProviderExit RECEIVED, code:', code)
           set({ isProviderRunning: false })
 
           // Finalizar mensagem de streaming
@@ -420,6 +427,7 @@ export const useStore = create<InfinyState>()(
           if (currentChat) {
             const lastMessage = currentChat.messages[currentChat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              console.log('[Renderer] [Pipeline] onProviderExit - Finalizing streaming message')
               get().updateMessage(currentChat.id, lastMessage.id, {
                 isStreaming: false,
               })

@@ -84,6 +84,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     const images = [...pendingImages]
     if (!text && images.length === 0) return
 
+    console.log('[ChatArea] [Pipeline] handleSend START', { textLength: text.length, imagesCount: images.length })
+
     setInputValue('')
 
     const userMessage = { role: 'user' as const, content: text, images: images.length > 0 ? images : undefined, timestamp: Date.now() }
@@ -91,7 +93,9 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
     clearPendingImages()
     clearProviderOutput()
+    console.log('[ChatArea] [Pipeline] Calling sendToProvider')
     await sendToProvider(currentChat!.id, text, images)
+    console.log('[ChatArea] [Pipeline] handleSend COMPLETED')
   }
 
   const handleStop = () => {

@@ -170,10 +170,12 @@ export class ProcessManager extends EventEmitter {
       child.stdout?.on(
         'data',
         (data: Buffer) => {
+          const output = data.toString()
+          console.log('[ProcessManager] [Pipeline] stdout DATA', { name, outputPreview: output.slice(0, 200) })
           this.emit(
             'process-output',
             name,
-            data.toString()
+            output
           )
         }
       )
@@ -182,10 +184,12 @@ export class ProcessManager extends EventEmitter {
       child.stderr?.on(
         'data',
         (data: Buffer) => {
+          const output = data.toString()
+          console.warn('[ProcessManager] [Pipeline] stderr DATA', { name, outputPreview: output.slice(0, 200) })
           this.emit(
             'process-output',
             name,
-            data.toString()
+            output
           )
         }
       )
@@ -264,9 +268,9 @@ export class ProcessManager extends EventEmitter {
         (code) => {
 
           console.log(
-            '[ProcessManager] closed:',
+            '[ProcessManager] [Pipeline] PROCESS CLOSED',
             name,
-            code
+            { code, signal: undefined }
           )
 
 
@@ -357,23 +361,51 @@ export class ProcessManager extends EventEmitter {
   writeToProcess(name: string, data: string): boolean {
     const info = this.processes.get(name)
 
+    console.log('[ProcessManager] [Pipeline] writeToProcess CALLED', {
+      name,
+      dataLength: data.length,
+      hasInfo: !!info,
+      processExists: !!info?.process,
+      processStatus: info?.status,
+      stdinExists: !!info?.process?.stdin,
+      stdinWritable: !!info?.process?.stdin?.writable
+    })
+
     if (!info || !info.process || info.status !== 'running') {
+      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: Process not running', {
+        name,
+        hasInfo: !!info,
+        processExists: !!info?.process,
+        status: info?.status
+      })
       return false
     }
 
     const stdin = info.process.stdin
 
     if (!stdin || !stdin.writable) {
+      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: stdin not writable', {
+        name,
+        stdinExists: !!stdin,
+        stdinWritable: !!stdin?.writable
+      })
       return false
     }
 
     try {
-      return stdin.write(data)
+      const bytesWritten = Buffer.byteLength(data, 'utf8')
+      const success = stdin.write(data)
+      console.log('[ProcessManager] [Pipeline] writeToProcess SUCCESS', {
+        name,
+        bytesWritten,
+        success
+      })
+      return success
     } catch (error) {
-      console.error(
-        `[ProcessManager] writeToProcess falhou: ${name}`,
-        error
-      )
+      console.error('[ProcessManager] [Pipeline] writeToProcess ERROR', {
+        name,
+        error: error instanceof Error ? error.message : String(error)
+      })
       return false
     }
   }

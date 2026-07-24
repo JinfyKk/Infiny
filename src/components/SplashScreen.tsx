@@ -88,9 +88,11 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
             return { ...step, status: 'active', message: data.details || 'Iniciando...' }
           }
           if (data.status === 'error') {
+            setError(data.details || `Erro no processo "${data.processName}"`)
             return { ...step, status: 'error', message: data.details || 'Erro' }
           }
           if (data.status === 'stopped') {
+            setError(data.details || `"${data.processName}" parou inesperadamente`)
             return { ...step, status: 'error', message: data.details || 'Parado inesperadamente' }
           }
           return step
@@ -112,6 +114,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       const stepId = processNameToStepId[data.name]
       if (!stepId) return
 
+      setError(data.error)
       setSteps((prev) =>
         prev.map((step) =>
           step.id === stepId
@@ -136,6 +139,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       if (!stepId) return
 
       if (data.code !== 0) {
+        setError(`${data.name} encerrou (código: ${data.code ?? 'signal'})`)
         setSteps((prev) =>
           prev.map((step) =>
             step.id === stepId
@@ -190,6 +194,19 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
 
 
   }, [])
+
+  useEffect(() => {
+    if (completedRef.current) return
+    const allCompleted = steps.every((step) => step.status === 'completed')
+    if (!allCompleted) return
+
+    completedRef.current = true
+    const timer = setTimeout(() => {
+      onComplete()
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [steps, onComplete])
 
     return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">

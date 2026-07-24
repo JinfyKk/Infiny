@@ -152,7 +152,7 @@ export class FreeClaudeProvider implements AIProvider {
    * se uma instalação futura gerar um shim .cmd em vez de um .exe nativo.
    */
   private async spawnFccServer(): Promise<void> {
-    console.log('[DEBUG] [FreeClaudeProvider] spawnFccServer() - START')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer START')
     const pm = this.processManager!
     const projectPath = this.config!.projectPath || process.cwd()
     const freeProvider = this.config!.freeProvider || 'openrouter'
@@ -171,7 +171,8 @@ export class FreeClaudeProvider implements AIProvider {
       fccServerArgs.push('--api-key', apiKey)
     }
 
-    console.log('[DEBUG] [FreeClaudeProvider] spawnFccServer() - spawning:', fccServerCmd, fccServerArgs.join(' '))
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer spawning:', fccServerCmd, fccServerArgs.join(' '))
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer config:', { projectPath, freeProvider, port: 8082, host: '127.0.0.1', apiKeyPresent: !!apiKey, isWindows })
 
     await pm.spawn(
       'fcc-server',
@@ -211,7 +212,7 @@ export class FreeClaudeProvider implements AIProvider {
 
     // Configurar auto-restart para fcc-server
     pm.configureRestart('fcc-server', 3, 2000)
-    console.log('[DEBUG] [FreeClaudeProvider] spawnFccServer() - END')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer END - process spawned and auto-restart configured')
   }
 
   /**
@@ -261,21 +262,26 @@ export class FreeClaudeProvider implements AIProvider {
    * Spawna o Claude CLI apontando para o proxy local.
    */
   private async spawnClaudeCli(): Promise<void> {
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - START')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli START')
     const pm = this.processManager!
     const projectPath = this.config!.projectPath || process.cwd()
     const proxyUrl = 'http://127.0.0.1:8082/v1'
 
     // buildClaudeCommand agora é async porque pode precisar resolver o
     // caminho do executável no Windows (findClaudeExecutable usa import dinâmico).
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - calling buildClaudeCommand()')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli calling buildClaudeCommand()')
     const { command, args, options } = await this.buildClaudeCommand(proxyUrl, projectPath)
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - buildClaudeCommand returned')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli buildClaudeCommand returned')
 
     console.log('[FreeClaudeProvider] Starting Claude CLI:', command, args.join(' '))
     console.log('[FreeClaudeProvider] Working directory:', projectPath)
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli env vars:', {
+      ANTHROPIC_BASE_URL: options.env?.ANTHROPIC_BASE_URL,
+      ANTHROPIC_AUTH_TOKEN: options.env?.ANTHROPIC_AUTH_TOKEN ? 'SET' : 'NOT SET',
+      CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: options.env?.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY,
+    })
 
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - calling pm.spawn() for claude')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli calling pm.spawn() for claude')
     await pm.spawn(
       'claude',
       command,
@@ -286,16 +292,16 @@ export class FreeClaudeProvider implements AIProvider {
         intervalMs: 10_000,
         check: async () => pm.isRunning('claude'),
         onFailure: (name) => {
-          console.warn(`[FreeClaudeProvider] Processo "${name}" parou, reiniciando...`)
+          console.warn(`[FreeClaudeProvider] [Pipeline] Process "${name}" stopped, restarting...`)
           pm.restart(name)
         },
       }
     )
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - pm.spawn() returned')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli pm.spawn() returned')
 
     // Configurar auto-restart para claude
     pm.configureRestart('claude', 3, 2000)
-    console.log('[DEBUG] [FreeClaudeProvider] spawnClaudeCli() - END')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli END - process spawned and auto-restart configured')
   }
 
   /**
@@ -324,6 +330,13 @@ export class FreeClaudeProvider implements AIProvider {
     const baseUrl = proxyUrl.replace(/\/v1$/, '')
     const authToken = (config as any).apiKey ?? 'freecc'
 
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] Building Claude command')
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] proxyUrl:', proxyUrl)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] baseUrl (ANTHROPIC_BASE_URL):', baseUrl)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] authToken present:', !!authToken, authToken ? 'yes' : 'no')
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] resolvedModelId:', this.resolvedModelId)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] baseArgs:', baseArgs.join(' '))
+
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       ANTHROPIC_BASE_URL: baseUrl,
@@ -338,10 +351,21 @@ export class FreeClaudeProvider implements AIProvider {
       DISABLE_ERROR_REPORTING: '1',
     }
 
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] Environment variables set:')
+    console.log('[FreeClaudeProvider] [buildClaudeCommand]   ANTHROPIC_BASE_URL:', env.ANTHROPIC_BASE_URL)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand]   ANTHROPIC_AUTH_TOKEN:', env.ANTHROPIC_AUTH_TOKEN ? '***SET***' : 'NOT SET')
+    console.log('[FreeClaudeProvider] [buildClaudeCommand]   CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY:', env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand]   CLAUDE_CODE_IDE:', env.CLAUDE_CODE_IDE)
+    console.log('[FreeClaudeProvider] [buildClaudeCommand]   CLAUDE_CODE_DISABLE_TELEMETRY:', env.CLAUDE_CODE_DISABLE_TELEMETRY)
+
     if (isWindows) {
       const claudePath = await this.findClaudeExecutable()
       const useShell =
         process.platform === 'win32' && claudePath.toLowerCase().endsWith('.cmd')
+
+      console.log('[FreeClaudeProvider] [buildClaudeCommand] Windows detected')
+      console.log('[FreeClaudeProvider] [buildClaudeCommand] claudePath:', claudePath)
+      console.log('[FreeClaudeProvider] [buildClaudeCommand] useShell:', useShell)
 
       return {
         command: claudePath,
@@ -355,6 +379,7 @@ export class FreeClaudeProvider implements AIProvider {
       }
     }
 
+    console.log('[FreeClaudeProvider] [buildClaudeCommand] Non-Windows platform, using "claude" command')
     return {
       command: 'claude',
       args: baseArgs,
@@ -440,6 +465,8 @@ export class FreeClaudeProvider implements AIProvider {
     // Cleanup listeners anteriores
     this.cleanupProcessManagerListeners()
 
+    console.log('[FreeClaudeProvider] [Pipeline] setupProcessManagerListeners() START')
+
     // NOTA: pm.on(...) aqui é o EventEmitter padrão do Node — ele retorna
     // `this` (pra permitir chaining), não uma função de cleanup. Por isso
     // guardamos a referência do handler e removemos com pm.off(...) depois,
@@ -447,8 +474,11 @@ export class FreeClaudeProvider implements AIProvider {
 
     // Output do processo "claude" (streaming NDJSON)
     const onOutput = (processName: string, output: string) => {
+      console.log('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessOutput', { processName, outputPreview: output.slice(0, 200) })
       if (processName === 'claude') {
         this.handleProviderOutput(output)
+      } else if (processName === 'fcc-server') {
+        console.log('[FreeClaudeProvider] [Pipeline] fcc-server output:', output.slice(0, 300))
       }
     }
     pm.on('process-output', onOutput)
@@ -456,6 +486,7 @@ export class FreeClaudeProvider implements AIProvider {
 
     // Erro do processo
     const onError = (info: ProcessInfo, error: Error) => {
+      console.error('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessError', { processName: info.name, error: error.message, stack: error.stack })
       if (info.name === 'claude' || info.name === 'fcc-server') {
         this.errorCallback?.(error.message)
       }
@@ -465,12 +496,15 @@ export class FreeClaudeProvider implements AIProvider {
 
     // Saída do processo
     const onStopped = (info: ProcessInfo, code: number | null) => {
+      console.log('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessStopped', { processName: info.name, code })
       if (info.name === 'claude') {
         this.exitCallback?.(code ?? 0)
       }
     }
     pm.on('process-stopped', onStopped)
     this.pmCleanups.push(() => pm.off('process-stopped', onStopped))
+
+    console.log('[FreeClaudeProvider] [Pipeline] setupProcessManagerListeners() END - listeners registered')
   }
 
   /**
@@ -478,18 +512,20 @@ export class FreeClaudeProvider implements AIProvider {
    * Parseia e chama callback de dados com apenas o texto.
    */
   private handleProviderOutput(rawData: string): void {
-    console.log('[FreeClaudeProvider] handleProviderOutput - START, rawData length:', rawData.length)
+    console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput START', { rawDataLength: rawData.length, bufferLength: this.messageBuffer.length })
     this.messageBuffer += rawData
     const lines = this.messageBuffer.split('\n')
     this.messageBuffer = lines.pop() || ''
+
+    console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput split into', lines.length, 'lines, buffer remaining:', this.messageBuffer.length)
 
     for (const line of lines) {
       if (!line.trim()) continue
 
       const parsed = this.parseStreamJson(line.trim())
-      console.log('[FreeClaudeProvider] handleProviderOutput - Parsed object:', parsed)
+      console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput parsed:', parsed)
       if (parsed?.text && this.dataCallback) {
-        console.log('[FreeClaudeProvider] handleProviderOutput - Calling dataCallback with type:', parsed.type, 'text length:', parsed.text.length)
+        console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput calling dataCallback', { type: parsed.type, textLength: parsed.text.length })
         if (parsed.type === 'assistant' || parsed.type === 'result') {
           this.dataCallback(parsed.text)
         } else if (parsed.type === 'system') {
@@ -503,10 +539,11 @@ export class FreeClaudeProvider implements AIProvider {
    * Envia mensagem para o Claude CLI via ProcessManager → stdin.
    */
   async send(message: string, images?: string[]): Promise<void> {
-    console.log('[FreeClaudeProvider] send() - START, message length:', message.length)
+    console.log('[FreeClaudeProvider] [Pipeline] send() START', { messageLength: message.length, imagesCount: images?.length || 0 })
     const pm = this.processManager!
     if (!pm.isRunning('claude')) {
-      console.error('[FreeClaudeProvider] send() - FAILED: No active claude process or stdin not writable')
+      console.error('[FreeClaudeProvider] [Pipeline] send() FAILED: No active claude process or stdin not writable')
+      console.error('[FreeClaudeProvider] [Pipeline] send() pm.isRunning("claude"):', pm.isRunning('claude'))
       throw new Error('Processo Claude não está rodando')
     }
 
@@ -523,14 +560,14 @@ export class FreeClaudeProvider implements AIProvider {
         })
       : JSON.stringify({ type: 'user', message: { role: 'user', content: message } })
 
-    console.log('[FreeClaudeProvider] send() - JSON payload sent to Claude:', payload)
+    console.log('[FreeClaudeProvider] [Pipeline] send() JSON payload to Claude:', payload.slice(0, 200) + (payload.length > 200 ? '...' : ''))
 
     const success = pm.writeToProcess('claude', payload + '\n')
     if (!success) {
-      console.error('[FreeClaudeProvider] send() - FAILED: writeToProcess returned false')
+      console.error('[FreeClaudeProvider] [Pipeline] send() FAILED: writeToProcess returned false')
       throw new Error('Falha ao escrever no stdin do processo claude')
     }
-    console.log('[FreeClaudeProvider] send() - SUCCESS, payload written to stdin')
+    console.log('[FreeClaudeProvider] [Pipeline] send() SUCCESS: payload written to stdin, bytes:', Buffer.byteLength(payload + '\n'))
   }
 
   /**
@@ -618,7 +655,7 @@ export class FreeClaudeProvider implements AIProvider {
   private parseStreamJson(line: string): { type: string; text?: string } | null {
     try {
       const parsed = JSON.parse(line)
-      console.log('[FreeClaudeProvider] parseStreamJson - Parsed JSON type:', parsed.type)
+      console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson PARSED', { type: parsed.type, subtype: parsed.subtype, hasMessage: !!parsed.message, hasResult: !!parsed.result })
 
       // Tipo: assistant - conteúdo da resposta
       if (parsed.type === 'assistant' && parsed.message?.content) {
@@ -627,14 +664,14 @@ export class FreeClaudeProvider implements AIProvider {
           .map((c: any) => c.text)
           .join('')
         if (textContent) {
-          console.log('[FreeClaudeProvider] parseStreamJson - Assistant message, text length:', textContent.length)
+          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson ASSISTANT', { textLength: textContent.length })
           return { type: 'assistant', text: textContent }
         }
       }
 
       // Tipo: result - resultado final
       if (parsed.type === 'result' && parsed.result) {
-        console.log('[FreeClaudeProvider] parseStreamJson - Result message, text length:', parsed.result.length)
+        console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson RESULT', { textLength: parsed.result.length })
         return { type: 'result', text: parsed.result }
       }
 
@@ -642,19 +679,19 @@ export class FreeClaudeProvider implements AIProvider {
       if (parsed.type === 'system') {
         if (parsed.subtype === 'init') {
           const initText = `Sessão iniciada (${parsed.model || this.resolvedModelId})`
-          console.log('[FreeClaudeProvider] parseStreamJson - System init:', initText)
+          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_INIT', initText)
           return { type: 'system', text: initText }
         }
         if (parsed.subtype === 'thinking_tokens') {
-          console.log('[FreeClaudeProvider] parseStreamJson - System thinking_tokens')
+          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_THINKING')
           return { type: 'thinking', text: '' }
         }
       }
 
-      console.log('[FreeClaudeProvider] parseStreamJson - Ignored type:', parsed.type)
+      console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson IGNORED type:', parsed.type)
       return null
     } catch (error) {
-      console.warn('[FreeClaudeProvider] parseStreamJson - FAILED to parse line:', line.substring(0, 100), 'error:', error instanceof Error ? error.message : String(error))
+      console.warn('[FreeClaudeProvider] [Pipeline] parseStreamJson FAILED', { linePreview: line.substring(0, 100), error: error instanceof Error ? error.message : String(error) })
       return null
     }
   }

@@ -96,7 +96,10 @@ export interface ProviderConfig {
  * Helper para criar listeners IPC com cleanup automático
  */
 function createIpcListener<T>(channel: string, callback: (event: T) => void): () => void {
-  const handler = (_event: Electron.IpcRendererEvent, data: T) => callback(data)
+  const handler = (_event: Electron.IpcRendererEvent, data: T) => {
+    console.log('[Preload] [IPC] Received:', channel, data)
+    callback(data)
+  }
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.off(channel, handler)
 }
@@ -104,36 +107,95 @@ function createIpcListener<T>(channel: string, callback: (event: T) => void): ()
 // Expor API ao renderer
 contextBridge.exposeInMainWorld('electronAPI', {
   // Projects
-  getProjects: () => ipcRenderer.invoke('get-projects'),
-  createProject: (name: string, path: string) => ipcRenderer.invoke('create-project', name, path),
-  selectFolder: () => ipcRenderer.invoke('select-folder'),
-  loadProject: (name: string) => ipcRenderer.invoke('load-project', name),
-  saveProject: (project: any) => ipcRenderer.invoke('save-project', project),
-  deleteProject: (name: string) => ipcRenderer.invoke('delete-project', name),
+  getProjects: () => {
+    console.log('[Preload] [IPC] Invoke: get-projects')
+    return ipcRenderer.invoke('get-projects')
+  },
+  createProject: (name: string, path: string) => {
+    console.log('[Preload] [IPC] Invoke: create-project', { name, path })
+    return ipcRenderer.invoke('create-project', name, path)
+  },
+  selectFolder: () => {
+    console.log('[Preload] [IPC] Invoke: select-folder')
+    return ipcRenderer.invoke('select-folder')
+  },
+  loadProject: (name: string) => {
+    console.log('[Preload] [IPC] Invoke: load-project', { name })
+    return ipcRenderer.invoke('load-project', name)
+  },
+  saveProject: (project: any) => {
+    console.log('[Preload] [IPC] Invoke: save-project', { name: project?.name })
+    return ipcRenderer.invoke('save-project', project)
+  },
+  deleteProject: (name: string) => {
+    console.log('[Preload] [IPC] Invoke: delete-project', { name })
+    return ipcRenderer.invoke('delete-project', name)
+  },
 
   // Provider
-  startProvider: (projectPath: string, config?: Partial<ProviderConfig>) =>
-    ipcRenderer.invoke('start-provider', projectPath, config),
-  sendToProvider: (chatId: string, message: string, images?: string[]) =>
-    ipcRenderer.invoke('send-to-provider', chatId, message, images),
-  stopProvider: () => ipcRenderer.invoke('stop-provider'),
-  restartProvider: () => ipcRenderer.invoke('restart-provider'),
-  getProviderConfig: () => ipcRenderer.invoke('get-provider-config'),
-  saveProviderConfig: (config: Partial<ProviderConfig>) =>
-    ipcRenderer.invoke('save-provider-config', config),
-  getAvailableProviders: () => ipcRenderer.invoke('get-available-providers'),
-  getProviderModels: () => ipcRenderer.invoke('get-provider-models'),
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>) => {
+    console.log('[Preload] [IPC] Invoke: start-provider', { projectPath, config })
+    return ipcRenderer.invoke('start-provider', projectPath, config)
+  },
+  sendToProvider: (chatId: string, message: string, images?: string[]) => {
+    console.log('[Preload] [IPC] Invoke: send-to-provider', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
+    return ipcRenderer.invoke('send-to-provider', chatId, message, images)
+  },
+  stopProvider: () => {
+    console.log('[Preload] [IPC] Invoke: stop-provider')
+    return ipcRenderer.invoke('stop-provider')
+  },
+  restartProvider: () => {
+    console.log('[Preload] [IPC] Invoke: restart-provider')
+    return ipcRenderer.invoke('restart-provider')
+  },
+  getProviderConfig: () => {
+    console.log('[Preload] [IPC] Invoke: get-provider-config')
+    return ipcRenderer.invoke('get-provider-config')
+  },
+  saveProviderConfig: (config: Partial<ProviderConfig>) => {
+    console.log('[Preload] [IPC] Invoke: save-provider-config', config)
+    return ipcRenderer.invoke('save-provider-config', config)
+  },
+  getAvailableProviders: () => {
+    console.log('[Preload] [IPC] Invoke: get-available-providers')
+    return ipcRenderer.invoke('get-available-providers')
+  },
+  getProviderModels: () => {
+    console.log('[Preload] [IPC] Invoke: get-provider-models')
+    return ipcRenderer.invoke('get-provider-models')
+  },
   // Alias for backward compatibility
-  getAvailableModels: () => ipcRenderer.invoke('get-provider-models'),
-  setActiveProvider: (providerId: string, config?: Partial<ProviderConfig>) =>
-    ipcRenderer.invoke('set-active-provider', providerId, config),
+  getAvailableModels: () => {
+    console.log('[Preload] [IPC] Invoke: get-provider-models (alias)')
+    return ipcRenderer.invoke('get-provider-models')
+  },
+  setActiveProvider: (providerId: string, config?: Partial<ProviderConfig>) => {
+    console.log('[Preload] [IPC] Invoke: set-active-provider', { providerId, config })
+    return ipcRenderer.invoke('set-active-provider', providerId, config)
+  },
 
   // Files
-  openFile: (path: string) => ipcRenderer.invoke('open-file', path),
-  getFileInfo: (path: string) => ipcRenderer.invoke('get-file-info', path),
-  readFile: (path: string) => ipcRenderer.invoke('read-file', path),
-  writeFile: (path: string, content: string) => ipcRenderer.invoke('write-file', path, content),
-  listFiles: (dirPath: string) => ipcRenderer.invoke('list-files', dirPath),
+  openFile: (path: string) => {
+    console.log('[Preload] [IPC] Invoke: open-file', { path })
+    return ipcRenderer.invoke('open-file', path)
+  },
+  getFileInfo: (path: string) => {
+    console.log('[Preload] [IPC] Invoke: get-file-info', { path })
+    return ipcRenderer.invoke('get-file-info', path)
+  },
+  readFile: (path: string) => {
+    console.log('[Preload] [IPC] Invoke: read-file', { path })
+    return ipcRenderer.invoke('read-file', path)
+  },
+  writeFile: (path: string, content: string) => {
+    console.log('[Preload] [IPC] Invoke: write-file', { path, contentLength: content.length })
+    return ipcRenderer.invoke('write-file', path, content)
+  },
+  listFiles: (dirPath: string) => {
+    console.log('[Preload] [IPC] Invoke: list-files', { dirPath })
+    return ipcRenderer.invoke('list-files', dirPath)
+  },
 
   // Process events (from ProcessManager via main.ts)
   onProcessStatus: (callback: (event: ProcessStatusEvent) => void) =>

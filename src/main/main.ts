@@ -112,26 +112,32 @@ function getProcessManager(): ProcessManager {
 
     // Encaminhar eventos do ProcessManager para o renderer
     processManager.on('process-started', (info: ProcessInfo) => {
+      console.log('[Main] [ProcessManager] process-started:', { name: info.name, command: info.command, args: info.args })
       sendToRenderer('process-started', { name: info.name, command: info.command, args: info.args })
     })
 
     processManager.on('process-stopped', (info: ProcessInfo, code: number | null) => {
+      console.log('[Main] [ProcessManager] process-stopped:', { name: info.name, code, signal: info.error })
       sendToRenderer('process-stopped', { name: info.name, code })
     })
 
     processManager.on('process-error', (info: ProcessInfo, error: Error) => {
+      console.error('[Main] [ProcessManager] process-error:', { name: info.name, error: error.message, stack: error.stack })
       sendToRenderer('process-error', { name: info.name, error: error.message })
     })
 
     processManager.on('process-output', (processName: string, output: string) => {
+      console.log('[Main] [ProcessManager] process-output:', { processName, outputPreview: output.slice(0, 200) })
       sendToRenderer('process-output', { processName, output })
     })
 
     processManager.on('process-restarting', (processName: string, attempt: number) => {
+      console.warn('[Main] [ProcessManager] process-restarting:', { processName, attempt })
       sendToRenderer('process-restarting', { processName, attempt })
     })
 
     processManager.on('status-changed', (processName: string, status: ProcessInfo['status'], details?: string) => {
+      console.log('[Main] [ProcessManager] status-changed:', { processName, status, details })
       sendToRenderer('process-status', { processName, status, details })
     })
 
@@ -252,7 +258,7 @@ function setupProviderListeners(): void {
  * antes de start()." que ocorria porque a injeção rodava DEPOIS do start().
  */
 async function initializeActiveProvider(projectPath: string): Promise<void> {
-  console.log('[DEBUG] initializeActiveProvider - START, projectPath:', projectPath)
+  console.log('[Main] [Pipeline] initializeActiveProvider START', { projectPath, activeProviderId, activeProviderConfig })
   const pm = getProcessManager()
   const config: ProviderConfig = {
     ...activeProviderConfig,
@@ -261,26 +267,28 @@ async function initializeActiveProvider(projectPath: string): Promise<void> {
 
   try {
     // 1. Pegar a instância do provider ANTES de iniciar
-    console.log('[DEBUG] initializeActiveProvider - getting provider:', activeProviderId)
+    console.log('[Main] [Pipeline] Getting provider instance:', activeProviderId)
     const provider = providerManager.getProvider(activeProviderId)
-    console.log('[DEBUG] initializeActiveProvider - got provider:', provider?.getId())
+    console.log('[Main] [Pipeline] Got provider:', provider?.getId())
 
     // 2. Injetar o ProcessManager antes do start()
     if (provider && 'setProcessManagerRef' in provider) {
-      console.log('[DEBUG] initializeActiveProvider - injecting ProcessManager')
+      console.log('[Main] [Pipeline] Injecting ProcessManager into provider')
       ;(provider as any).setProcessManagerRef(pm)
-      console.log('[DEBUG] initializeActiveProvider - ProcessManager injected')
+      console.log('[Main] [Pipeline] ProcessManager injected successfully')
+    } else {
+      console.warn('[Main] [Pipeline] Provider does not have setProcessManagerRef method')
     }
 
     // 3. Agora sim, iniciar o provider já com o ProcessManager disponível
-    console.log('[DEBUG] initializeActiveProvider - calling setActiveProvider')
+    console.log('[Main] [Pipeline] Calling setActiveProvider with config')
     await providerManager.setActiveProvider(activeProviderId, config)
-    console.log('[DEBUG] initializeActiveProvider - setActiveProvider completed')
+    console.log('[Main] [Pipeline] setActiveProvider completed successfully')
 
     sendToRenderer('provider-started', { providerId: activeProviderId })
-    console.log('[DEBUG] initializeActiveProvider - END SUCCESS')
+    console.log('[Main] [Pipeline] initializeActiveProvider SUCCESS')
   } catch (error: any) {
-    console.error('[DEBUG] initializeActiveProvider - ERROR:', error)
+    console.error('[Main] [Pipeline] initializeActiveProvider FAILED:', error)
     sendToRenderer('provider-error', `Falha ao iniciar provedor: ${error.message}`)
     throw error
   }
@@ -302,24 +310,25 @@ async function stopActiveProvider(): Promise<void> {
  */
 async function sendToActiveProvider(message: string, images?: string[]): Promise<boolean> {
   try {
-    console.log('[Main] sendToActiveProvider - START, message length:', message.length)
+    console.log('[Main] [Pipeline] sendToActiveProvider RECEIVED', { messageLength: message.length, imagesCount: images?.length || 0 })
     const activeProvider = providerManager.getActiveProvider()
 
     if (!activeProvider) {
-      console.error('[Main] sendToActiveProvider - No active provider')
+      console.error('[Main] [Pipeline] sendToActiveProvider FAILED: No active provider')
       sendToRenderer('provider-error', 'Nenhum provedor ativo')
       return false
     }
 
-    console.log('[Main] sendToActiveProvider - Active provider:', activeProvider.getId())
+    console.log('[Main] [Pipeline] sendToActiveProvider: Active provider is', activeProvider.getId())
 
     // Delegar SEMPRE para o Provider via ProviderManager.send()
     // O Provider sabe como lidar com seu próprio transporte (ProcessManager, stdio, HTTP, etc.)
+    console.log('[Main] [Pipeline] Calling providerManager.send()')
     await providerManager.send(message, images)
-    console.log('[Main] sendToActiveProvider - SUCCESS')
+    console.log('[Main] [Pipeline] sendToActiveProvider SUCCESS')
     return true
   } catch (error: any) {
-    console.error('[Main] sendToActiveProvider - ERROR:', error)
+    console.error('[Main] [Pipeline] sendToActiveProvider ERROR:', error)
     sendToRenderer('provider-error', `Erro ao enviar mensagem: ${error.message}`)
     return false
   }
@@ -411,9 +420,9 @@ ipcMain.handle('start-provider', async (_event, projectPath: string, config?: Pa
  * Envia mensagem para o provedor ativo.
  */
 ipcMain.handle('send-to-provider', async (_event, _chatId: string, message: string, images?: string[]) => {
-  console.log('[Main] IPC send-to-provider RECEIVED - message length:', message.length, 'images:', images?.length || 0)
+  console.log('[Main] [IPC] send-to-provider RECEIVED', { messageLength: message.length, imagesCount: images?.length || 0 })
   const success = await sendToActiveProvider(message, images)
-  console.log('[Main] IPC send-to-provider COMPLETED - success:', success)
+  console.log('[Main] [IPC] send-to-provider COMPLETED', { success })
   return { success }
 })
 
