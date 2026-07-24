@@ -189,6 +189,16 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           )
         )
       }),
+      window.electronAPI?.onProviderHealthy?.(() => {
+        console.log('[SplashScreen] provider-healthy event received, completing health step')
+        setSteps((prev) =>
+          prev.map((step) =>
+            step.id === 'health'
+              ? { ...step, status: 'completed', message: 'Servidor saudável' }
+              : step
+          )
+        )
+      }),
     ]
 
 

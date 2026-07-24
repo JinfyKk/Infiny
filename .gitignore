@@ -3,4 +3,5 @@ dist/
 build/
 .env
 .vscode/
-*.log
+*.logfcc_log.txt
+fcc_log2.txt

@@ -285,6 +285,15 @@ async function initializeActiveProvider(projectPath: string): Promise<void> {
       console.warn('[Main] [Pipeline] Provider does not have setProcessManagerRef method')
     }
 
+    // 4. Escutar evento de health check do fcc-server (específico do FreeClaudeProvider)
+    if (provider && 'onHealthy' in provider) {
+      console.log('[Main] [Pipeline] Registering onHealthy callback for FreeClaudeProvider')
+      ;(provider as any).onHealthy(() => {
+        console.log('[Main] [Pipeline] FreeClaudeProvider healthy, forwarding to renderer')
+        sendToRenderer('provider-healthy', {})
+      })
+    }
+
     // 3. Agora sim, iniciar o provider já com o ProcessManager disponível
     console.log('[Main] [Pipeline] Calling setActiveProvider with config')
     await providerManager.setActiveProvider(activeProviderId, config)

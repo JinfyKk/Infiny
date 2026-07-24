@@ -66,6 +66,7 @@ export class FreeClaudeProvider implements AIProvider {
   private errorCallback: ((error: string) => void) | null = null
   private exitCallback: ((code: number) => void) | null = null
   private readyCallback: (() => void) | null = null
+  private healthyCallback: (() => void) | null = null
 
   // Buffer para parsing NDJSON
   private messageBuffer = ''
@@ -160,6 +161,9 @@ export class FreeClaudeProvider implements AIProvider {
     console.log('[DEBUG] [FreeClaudeProvider] start() - calling waitForServerHealthy()')
     await this.waitForServerHealthy()
     console.log('[DEBUG] [FreeClaudeProvider] start() - waitForServerHealthy() completed')
+
+    // 4.5. Emitir evento de servidor saudável
+    this.healthyCallback?.()
 
     // 5. Spawn Claude CLI apontando para o proxy
     console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnClaudeCli()')
@@ -282,6 +286,7 @@ export class FreeClaudeProvider implements AIProvider {
             const response = await fetch('http://127.0.0.1:8082/health', {
               method: 'GET',
               signal: AbortSignal.timeout(2000),
+              headers: { Authorization: 'Bearer freecc' },
             })
             // APENAS 2xx = saudável. 404 NÃO é sucesso (health endpoint deve retornar 200 OK)
             return response.ok
@@ -353,7 +358,11 @@ export class FreeClaudeProvider implements AIProvider {
         try {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 2000)
-          const response = await fetch(url, { method: 'GET', signal: controller.signal })
+          const response = await fetch(url, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { Authorization: 'Bearer freecc' },
+          })
           clearTimeout(timeoutId)
 
           // APENAS 2xx = sucesso. 404 NÃO é sucesso (health endpoint deve retornar 200 OK)
@@ -769,6 +778,13 @@ export class FreeClaudeProvider implements AIProvider {
     this.readyCallback = callback
     return () => {
       this.readyCallback = null
+    }
+  }
+
+  onHealthy(callback: () => void): () => void {
+    this.healthyCallback = callback
+    return () => {
+      this.healthyCallback = null
     }
   }
 
