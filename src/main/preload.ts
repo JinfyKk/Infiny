@@ -79,6 +79,7 @@ export interface ElectronAPI {
   onProviderOutput: (callback: (data: string) => void) => () => void
   onProviderError: (callback: (error: string) => void) => () => void
   onProviderExit: (callback: (code: number) => void) => () => void
+  onProviderReady: (callback: () => void) => () => void
 }
 
 /**
@@ -218,6 +219,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createIpcListener<string>('provider-error', callback),
   onProviderExit: (callback: (code: number) => void) =>
     createIpcListener<number>('provider-exit', callback),
+  onProviderReady: (callback: () => void) =>
+    createIpcListener<void>('provider-ready', callback),
 })
 
 export {}

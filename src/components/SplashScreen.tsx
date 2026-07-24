@@ -179,6 +179,16 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       window.electronAPI?.onProcessError?.(handleError),
       window.electronAPI?.onProcessStopped?.(handleProcessStopped),
       window.electronAPI?.onProcessRestarting?.(handleRestarting),
+      window.electronAPI?.onProviderReady?.(() => {
+        console.log('[SplashScreen] provider-ready event received, completing connect step')
+        setSteps((prev) =>
+          prev.map((step) =>
+            step.id === 'connect'
+              ? { ...step, status: 'completed', message: 'Conectado' }
+              : step
+          )
+        )
+      }),
     ]
 
 

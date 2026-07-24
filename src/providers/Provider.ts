@@ -98,6 +98,12 @@ export interface AIProvider {
    * Retorna função de cleanup.
    */
   onExit(callback: (code: number) => void): () => void
+
+  /**
+   * Registra callback para quando o provider está totalmente pronto (processos spawneados e saudáveis).
+   * Retorna função de cleanup.
+   */
+  onReady(callback: () => void): () => void
 }
 
 /**
@@ -128,11 +134,13 @@ export class ProviderManager {
   private dataListeners: Set<(data: string) => void> = new Set()
   private errorListeners: Set<(error: string) => void> = new Set()
   private exitListeners: Set<(code: number) => void> = new Set()
+  private readyListeners: Set<() => void> = new Set()
 
   // Provider-specific listener cleanups
   private activeDataCleanup: (() => void) | null = null
   private activeErrorCleanup: (() => void) | null = null
   private activeExitCleanup: (() => void) | null = null
+  private activeReadyCleanup: (() => void) | null = null
 
   /**
    * Registra uma factory de provider.
@@ -353,6 +361,15 @@ export class ProviderManager {
     return () => this.exitListeners.delete(callback)
   }
 
+  /**
+   * Registra listener global para quando o provider está pronto.
+   * Retorna função de cleanup.
+   */
+  onReady(callback: () => void): () => void {
+    this.readyListeners.add(callback)
+    return () => this.readyListeners.delete(callback)
+  }
+
   // ========== Internal ==========
 
   /**
@@ -376,6 +393,10 @@ export class ProviderManager {
       // Auto-cleanup quando provider para
       this.cleanupProviderListeners()
     })
+
+    this.activeReadyCleanup = this.activeProvider.onReady?.(() => {
+      this.readyListeners.forEach((cb) => cb())
+    })
   }
 
   /**
@@ -393,6 +414,10 @@ export class ProviderManager {
     if (this.activeExitCleanup) {
       this.activeExitCleanup()
       this.activeExitCleanup = null
+    }
+    if (this.activeReadyCleanup) {
+      this.activeReadyCleanup()
+      this.activeReadyCleanup = null
     }
   }
 }

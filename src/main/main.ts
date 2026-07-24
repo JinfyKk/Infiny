@@ -244,6 +244,11 @@ function setupProviderListeners(): void {
   providerManager.onExit((code: number) => {
     sendToRenderer('provider-exit', code)
   })
+
+  providerManager.onReady(() => {
+    console.log('[Main] [ProviderManager] provider-ready event received, forwarding to renderer')
+    sendToRenderer('provider-ready', { providerId: activeProviderId })
+  })
 }
 
 /**

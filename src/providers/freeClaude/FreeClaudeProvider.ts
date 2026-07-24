@@ -65,6 +65,7 @@ export class FreeClaudeProvider implements AIProvider {
   private dataCallback: ((data: string) => void) | null = null
   private errorCallback: ((error: string) => void) | null = null
   private exitCallback: ((code: number) => void) | null = null
+  private readyCallback: (() => void) | null = null
 
   // Buffer para parsing NDJSON
   private messageBuffer = ''
@@ -169,6 +170,10 @@ export class FreeClaudeProvider implements AIProvider {
     console.log('[DEBUG] [FreeClaudeProvider] start() - calling setupProcessManagerListeners()')
     this.setupProcessManagerListeners()
     console.log('[DEBUG] [FreeClaudeProvider] start() - END')
+
+    // 7. Emitir evento de provider pronto
+    console.log('[DEBUG] [FreeClaudeProvider] start() - emitting provider-ready event')
+    this.readyCallback?.()
   }
 
   /**
@@ -756,6 +761,13 @@ export class FreeClaudeProvider implements AIProvider {
     this.exitCallback = callback
     return () => {
       this.exitCallback = null
+    }
+  }
+
+  onReady(callback: () => void): () => void {
+    this.readyCallback = callback
+    return () => {
+      this.readyCallback = null
     }
   }
 

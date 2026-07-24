@@ -20,6 +20,7 @@ export class ClaudeProvider implements AIProvider {
   private dataCallback: ((data: string) => void) | null = null
   private errorCallback: ((error: string) => void) | null = null
   private exitCallback: ((code: number) => void) | null = null
+  private readyCallback: (() => void) | null = null
 
   constructor(_providerManager: ProviderManager) {}
 
@@ -118,6 +119,12 @@ export class ClaudeProvider implements AIProvider {
       }
       this.process = null
     })
+
+    // Emit ready when process is confirmed spawned
+    this.process.on('spawn', () => {
+      console.log('[ClaudeProvider] Process spawned, emitting ready')
+      this.readyCallback?.()
+    })
   }
 
   async send(message: string, images?: string[]): Promise<void> {
@@ -189,6 +196,13 @@ export class ClaudeProvider implements AIProvider {
     this.exitCallback = callback
     return () => {
       this.exitCallback = null
+    }
+  }
+
+  onReady(callback: () => void): () => void {
+    this.readyCallback = callback
+    return () => {
+      this.readyCallback = null
     }
   }
 
