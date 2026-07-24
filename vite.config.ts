@@ -3,11 +3,19 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  base: './', // essencial: sem isso os assets quebram sob file://
+  base: './',
   plugins: [react()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    },
   },
-  server: { port: 5173, host: true },
-  build: { outDir: 'dist', emptyOutDir: true },
+  server: {
+    port: 5173,
+    host: true
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true
+  },
 })

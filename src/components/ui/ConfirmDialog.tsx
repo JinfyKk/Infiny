@@ -3,18 +3,10 @@ import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { motion, AnimatePresence } from 'framer-motion'
-
-const overlayVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.2 } },
-  exit: { opacity: 0, transition: { duration: 0.15 } }
-} as const
-
-const contentVariants = {
-  initial: { opacity: 0, scale: 0.95, y: 20 },
-  animate: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } },
-  exit: { opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.15, ease: 'easeIn' } }
-} as const
+import {
+  modalBackdropVariants,
+  modalContentVariants,
+} from '@/lib/transitions'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -72,9 +64,9 @@ export function ConfirmDialog({
     <AnimatePresence mode="wait">
       <motion.div
         ref={overlayRef}
-        variants={overlayVariants}
-        initial="initial"
-        animate="animate"
+        variants={modalBackdropVariants}
+        initial="hidden"
+        animate="visible"
         exit="exit"
         className="fixed inset-0 z-[99] flex items-center justify-center bg-black/50"
         onClick={handleOverlayClick}
@@ -85,9 +77,9 @@ export function ConfirmDialog({
         <motion.div
           ref={contentRef}
           tabIndex={-1}
-          variants={contentVariants}
-          initial="initial"
-          animate="animate"
+          variants={modalContentVariants}
+          initial="hidden"
+          animate="visible"
           exit="exit"
           className={cn(
             'w-full max-w-md mx-4 bg-background border border-border rounded-xl shadow-xl',

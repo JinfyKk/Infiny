@@ -298,35 +298,28 @@ async function stopActiveProvider(): Promise<void> {
 
 /**
  * Envia mensagem para o provedor ativo.
+ * SEMPRE delega para o Provider via ProviderManager (não escreve direto no ProcessManager).
  */
 async function sendToActiveProvider(message: string, images?: string[]): Promise<boolean> {
   try {
-    const pm = getProcessManager()
+    console.log('[Main] sendToActiveProvider - START, message length:', message.length)
     const activeProvider = providerManager.getActiveProvider()
 
-    // Para FreeClaude, escrever no stdin do processo "claude" via ProcessManager
-    if (activeProvider && activeProvider.getId() === 'free-claude' && pm.isRunning('claude')) {
-      const payload = images && images.length > 0
-        ? JSON.stringify({
-            type: 'user',
-            message: {
-              role: 'user',
-              content: [
-                { type: 'text', text: message },
-                ...images.map((img) => ({ type: 'image', source: { type: 'base64', data: img } }))
-              ]
-            }
-          })
-        : JSON.stringify({ type: 'user', message: { role: 'user', content: message } })
-
-      return pm.writeToProcess('claude', payload + '\n')
+    if (!activeProvider) {
+      console.error('[Main] sendToActiveProvider - No active provider')
+      sendToRenderer('provider-error', 'Nenhum provedor ativo')
+      return false
     }
 
-    // Para outros providers, usar a API padrão do ProviderManager
+    console.log('[Main] sendToActiveProvider - Active provider:', activeProvider.getId())
+
+    // Delegar SEMPRE para o Provider via ProviderManager.send()
+    // O Provider sabe como lidar com seu próprio transporte (ProcessManager, stdio, HTTP, etc.)
     await providerManager.send(message, images)
+    console.log('[Main] sendToActiveProvider - SUCCESS')
     return true
   } catch (error: any) {
-    console.error('[Main] Failed to send to provider:', error)
+    console.error('[Main] sendToActiveProvider - ERROR:', error)
     sendToRenderer('provider-error', `Erro ao enviar mensagem: ${error.message}`)
     return false
   }
@@ -418,7 +411,9 @@ ipcMain.handle('start-provider', async (_event, projectPath: string, config?: Pa
  * Envia mensagem para o provedor ativo.
  */
 ipcMain.handle('send-to-provider', async (_event, _chatId: string, message: string, images?: string[]) => {
+  console.log('[Main] IPC send-to-provider RECEIVED - message length:', message.length, 'images:', images?.length || 0)
   const success = await sendToActiveProvider(message, images)
+  console.log('[Main] IPC send-to-provider COMPLETED - success:', success)
   return { success }
 })
 

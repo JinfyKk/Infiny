@@ -1,25 +1,21 @@
-import { useRef, useEffect, useState } from 'react'
-import { Send, X, Paperclip, Globe, StopCircle, Sparkles, FolderOpen, MessageSquare, FileText } from 'lucide-react'
+import { useRef, useEffect, useState, useCallback } from 'react'
+import { Send, X, Paperclip, Globe, StopCircle, Sparkles, FolderOpen, MessageSquare, FileText, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/infinyStore'
 import { Button } from '@/components/ui/Button'
+import { AnimatedTextarea } from '@/components/ui/AnimatedComponents'
 import { Message } from './Message'
 import { TypingIndicator } from './TypingIndicator'
 import { ModelSelector } from './ModelSelector'
 import { EffortSelector } from './EffortSelector'
+import { ProviderSelector } from './ProviderSelector'
 import { ThemeSelector } from '@/theme/ThemeSelector'
 import { motion, AnimatePresence } from 'framer-motion'
-
-const messageVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } },
-  exit: { opacity: 0, y: -20, height: 0, transition: { duration: 0.15, ease: 'easeIn' } }
-} as const
-
-const typingIndicatorVariants = {
-  hidden: { opacity: 0, y: 10, scale: 0.95 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } }
-} as const
+import {
+  typingIndicatorContainerVariants,
+  transitions,
+} from '@/lib/transitions'
+import { StaggerContainer, StaggerItem } from '@/components/ui/AnimatedComponents'
 
 interface ChatAreaProps {
   isFilesPanelOpen: boolean
@@ -31,37 +27,49 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     currentChat,
     currentProject,
     settings,
-    isClaudeRunning,
-    claudeOutput,
+    isProviderRunning,
+    providerOutput,
     pendingImages,
     addMessage,
     updateSettings,
-    sendToClaude,
-    stopClaude,
-    clearClaudeOutput,
+    sendToProvider,
+    stopProvider,
+    clearProviderOutput,
     addPendingImage,
     removePendingImage,
     clearPendingImages,
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [inputValue, setInputValue] = useState('')
-  const [inputHeight, setInputHeight] = useState(48)
-  const [showModelSelector, setShowModelSelector] = useState(false)
-  const [showEffortSelector, setShowEffortSelector] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+
+  // Carregar modelos do provider ativo
+  const loadModels = useCallback(async () => {
+    if (!window.electronAPI?.getAvailableModels) return []
+    try {
+      const models = await window.electronAPI.getAvailableModels()
+      if (models.length > 0) {
+        return models.map((m) => ({
+          value: m.value,
+          label: m.label,
+          description: m.description,
+          icon: <Brain className="w-4 h-4" />,
+        }))
+      }
+    } catch (error) {
+      console.error('[ChatArea] Erro ao carregar modelos:', error)
+    }
+    return []
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentChat?.messages, isClaudeRunning, claudeOutput])
+  }, [currentChat?.messages, isProviderRunning, providerOutput])
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setInputValue(value)
-    textareaRef.current?.style.setProperty('height', 'auto')
-    const height = Math.min(Math.max(textareaRef.current?.scrollHeight || 48, 48), 200)
-    setInputHeight(height)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -77,19 +85,17 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     if (!text && images.length === 0) return
 
     setInputValue('')
-    setInputHeight(48)
-    textareaRef.current?.style.setProperty('height', '48px')
 
     const userMessage = { role: 'user' as const, content: text, images: images.length > 0 ? images : undefined, timestamp: Date.now() }
     addMessage(currentChat!.id, userMessage)
 
     clearPendingImages()
-    clearClaudeOutput()
-    await sendToClaude(currentChat!.id, text, images)
+    clearProviderOutput()
+    await sendToProvider(currentChat!.id, text, images)
   }
 
   const handleStop = () => {
-    stopClaude()
+    stopProvider()
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -162,7 +168,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
             </div>
             <h2 className="text-2xl font-medium text-text mb-3">Bem-vindo ao Infiny</h2>
             <p className="text-textSecondary mb-6 leading-relaxed">
-              Selecione ou crie um projeto na barra lateral para começar a conversar com o Claude Code.
+              Selecione ou crie um projeto na barra lateral para começar a conversar.
             </p>
             <div className="flex items-center justify-center gap-3 text-xs text-textMuted">
               <kbd className="px-2 py-1 bg-surface border border-border rounded">Ctrl</kbd>
@@ -179,43 +185,71 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden relative">
       {/* Top Bar */}
-      <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
+      <header className="flex items-center justify-between h-14 px-3 border-b border-border bg-background/80 backdrop-blur-sm z-10">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={transitions.smooth}
+          className="flex items-center gap-2"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.05 }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+          >
             <FolderOpen className="w-4 h-4 text-textSecondary" />
             <span className="text-sm font-medium text-text truncate max-w-[200px]">{currentProject.name}</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.1 }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+          >
             <MessageSquare className="w-4 h-4 text-textSecondary" />
             <span className="text-sm font-medium text-text truncate max-w-[250px]">{currentChat.title}</span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="flex items-center gap-1">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={transitions.smooth}
+          className="flex items-center gap-1"
+        >
           {/* Model Settings Group */}
-          <div className="flex items-center gap-1">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.05 }}
+            className="flex items-center gap-1"
+          >
+            <ProviderSelector />
             <ModelSelector
               model={settings.model}
               onChange={(model) => updateSettings({ model })}
-              isOpen={showModelSelector}
-              onToggle={() => { setShowModelSelector(!showModelSelector); setShowEffortSelector(false) }}
+              fetchModels={loadModels}
             />
             <EffortSelector
               effort={settings.effort}
               onChange={(effort) => updateSettings({ effort })}
-              isOpen={showEffortSelector}
-              onToggle={() => { setShowEffortSelector(!showEffortSelector); setShowModelSelector(false) }}
             />
-          </div>
+          </motion.div>
 
           <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
 
           {/* Actions Group */}
-          <div className="flex items-center gap-1">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.1 }}
+            className="flex items-center gap-1"
+          >
             <Button
-              variant="ghost"
+              variant={settings.webSearch ? 'subtle' : 'ghost'}
               size="icon"
-              className={cn('text-textSecondary hover:text-textPrimary', settings.webSearch && 'text-primary')}
+              interactionType="icon-pulse"
               onClick={() => updateSettings({ webSearch: !settings.webSearch })}
               aria-label={settings.webSearch ? 'Desativar busca na web' : 'Ativar busca na web'}
               title={settings.webSearch ? 'Busca na web ativa' : 'Ativar busca na web'}
@@ -223,22 +257,28 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
               <Globe className="w-5 h-5" />
             </Button>
             <Button
-              variant="ghost"
+              variant={isFilesPanelOpen ? 'subtle' : 'ghost'}
               size="icon"
+              interactionType="icon-pulse"
               onClick={onToggleFilesPanel}
               aria-label={isFilesPanelOpen ? 'Fechar arquivos gerados' : 'Abrir arquivos gerados'}
               title={isFilesPanelOpen ? 'Fechar painel de arquivos' : 'Arquivos gerados'}
-              className={cn('text-textSecondary hover:text-textPrimary', isFilesPanelOpen && 'text-primary')}
             >
               <FileText className="w-5 h-5" />
             </Button>
-          </div>
+          </motion.div>
 
           <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
 
           {/* Theme Group */}
-          <ThemeSelector />
-        </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.15 }}
+          >
+            <ThemeSelector />
+          </motion.div>
+        </motion.div>
       </header>
 
       {/* Messages Area */}
@@ -248,40 +288,51 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <AnimatePresence mode="popLayout">
-          {currentChat.messages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              variants={messageVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              style={{ transitionDelay: `${index * 0.03}s` as const }}
-            >
-              <Message message={message} isStreaming={message.isStreaming} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        <StaggerContainer speed="normal" className="space-y-4">
+          <AnimatePresence mode="popLayout">
+            {currentChat.messages.map((message) => (
+              <StaggerItem key={message.id} animation="fade">
+                <Message message={message} isStreaming={message.isStreaming} />
+              </StaggerItem>
+            ))}
+          </AnimatePresence>
+        </StaggerContainer>
 
-        {isClaudeRunning && (
+        {isProviderRunning && (
           <motion.div
-            variants={typingIndicatorVariants}
+            variants={typingIndicatorContainerVariants}
             initial="hidden"
             animate="visible"
             exit="hidden"
             className="flex items-start gap-3"
           >
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={transitions.smooth}
+              className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5"
+            >
               <Sparkles className="w-4 h-4 text-primary" />
-            </div>
+            </motion.div>
             <div className="flex-1 max-w-[85%]">
-              <div className="bg-surfaceHover rounded-2xl rounded-bl-md p-4">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={transitions.smooth}
+                className="bg-surfaceHover rounded-2xl rounded-bl-md p-4"
+              >
                 <TypingIndicator />
-              </div>
-              {claudeOutput && (
-                <div className="mt-2 p-3 bg-surface/50 border border-border rounded-lg font-mono text-xs text-textSecondary max-h-40 overflow-y-auto">
-                  {claudeOutput.slice(-2000)}
-                </div>
+              </motion.div>
+              {providerOutput && (
+                <motion.div
+                  initial={{ opacity: 0, scaleY: 0.8, y: -8 }}
+                  animate={{ opacity: 1, scaleY: 1, y: 0 }}
+                  exit={{ opacity: 0, scaleY: 0.8, y: -8 }}
+                  transition={transitions.smooth}
+                  className="mt-2 p-3 bg-surface/50 border border-border rounded-lg font-mono text-xs text-textSecondary max-h-40 overflow-y-auto transform-origin-top"
+                >
+                  {providerOutput.slice(-2000)}
+                </motion.div>
               )}
             </div>
           </motion.div>
@@ -292,26 +343,56 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
       {/* Pending Images Preview */}
       {pendingImages.length > 0 && (
-        <div className="px-4 pb-2 flex flex-wrap gap-2 max-h-24 overflow-y-auto border-t border-border/50">
+        <motion.div
+          initial={{ opacity: 0, scaleY: 0.8, y: -10 }}
+          animate={{ opacity: 1, scaleY: 1, y: 0 }}
+          exit={{ opacity: 0, scaleY: 0.8, y: -10 }}
+          transition={transitions.smooth}
+          className="px-3 pb-2 flex flex-wrap gap-2 max-h-24 overflow-y-auto border-t border-border/50 transform-origin-top"
+        >
           {pendingImages.map((img, index) => (
-            <div key={index} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border">
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -10 }}
+              transition={transitions.bouncy}
+              className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
+            >
               <img src={img} alt="Preview" className="w-full h-full object-cover" />
-              <button
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={() => removePendingImage(index)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
                 aria-label="Remover imagem"
               >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
+                <X className="w-4 h-4" />
+              </motion.button>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {/* Input Area */}
-      <div className={cn('p-4 border-t border-border bg-background/80 backdrop-blur-sm', dragActive && 'bg-primary/5 border-t-primary')}>
-        <div className="flex items-end gap-2">
-          <label className="flex-shrink-0 p-1 rounded-lg hover:bg-surfaceHover transition-colors" aria-label="Anexar imagem">
+      <motion.div
+        className={cn('p-3 border-t border-border bg-background/80 backdrop-blur-sm', dragActive && 'bg-primary/5 border-t-primary')}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1, backgroundColor: dragActive ? 'var(--primary)/0.05' : 'transparent' }}
+        transition={transitions.smooth}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...transitions.smooth, delay: 0.1 }}
+          className="flex items-end gap-2"
+        >
+          <motion.label
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex-shrink-0 p-1 rounded-lg hover:bg-surfaceHover transition-colors"
+            aria-label="Anexar imagem"
+          >
             <input
               type="file"
               accept="image/*"
@@ -321,51 +402,51 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
               id="file-upload"
             />
             <Paperclip className="w-5 h-5 text-textSecondary hover:text-textPrimary" />
-          </label>
+          </motion.label>
 
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.15 }}
+            className="flex-1 relative"
+          >
+            <AnimatedTextarea
               value={inputValue}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={isClaudeRunning ? 'Claude está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
-              disabled={isClaudeRunning}
+              placeholder={isProviderRunning ? 'IA está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
+              disabled={isProviderRunning}
+              minRows={1}
+              maxRows={8}
               className={cn(
-                'w-full bg-surface border border-border rounded-2xl px-4 py-3 text-text placeholder-textMuted',
-                'focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent',
-                'resize-none transition-all duration-150',
-                'min-h-[48px] max-h-[200px]',
-                'font-sans text-base leading-relaxed',
+                'bg-surface border-border rounded-2xl',
+                'focus-visible:ring-primary focus-visible:border-transparent',
                 dragActive && 'border-primary/50 bg-primary/5'
               )}
-              style={{ height: inputHeight }}
-              rows={1}
               aria-label="Mensagem"
             />
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-1">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.2 }}
+            className="flex items-center gap-1"
+          >
             <Button
-              variant={isClaudeRunning ? 'danger' : 'primary'}
+              variant={isProviderRunning ? 'danger' : 'primary'}
               size="icon"
-              onClick={isClaudeRunning ? handleStop : handleSend}
-              disabled={(!inputValue.trim() && pendingImages.length === 0) || isClaudeRunning}
-              aria-label={isClaudeRunning ? 'Parar geração' : 'Enviar mensagem'}
-              className={cn('h-10 w-10 rounded-xl', isClaudeRunning ? 'text-error hover:bg-error/10' : 'text-white hover:bg-primaryHover')}
+              onClick={isProviderRunning ? handleStop : handleSend}
+              disabled={(!inputValue.trim() && pendingImages.length === 0) || isProviderRunning}
+              aria-label={isProviderRunning ? 'Parar geração' : 'Enviar mensagem'}
+              interactionType="icon-pulse"
             >
-              {isClaudeRunning ? <StopCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+              {isProviderRunning ? <StopCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 mt-2 text-xs text-textMuted">
-          <span>Modelo: <strong className="text-text">{settings.model.replace('claude-', '').replace(/-/g, ' ')}</strong></span>
-          <span>Effort: <strong className="text-text capitalize">{settings.effort}</strong></span>
-          {settings.webSearch && <span className="text-primary">🌐 Busca na Web ativa</span>}
-        </div>
-      </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     </div>
   )
 }

@@ -6,8 +6,13 @@ import { ChatArea } from './components/ChatArea'
 import { FilesPanel } from './components/FilesPanel'
 import { ThemeSelector } from '@/theme'
 import { ThemeProvider } from '@/theme'
+import { Onboarding } from './components/Onboarding'
+import { SplashScreen } from './components/SplashScreen'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useSidebarShortcut } from '@/hooks/useKeyboardShortcuts'
+import { fadeInUpVariants, staggerContainerVariants } from '@/lib/transitions'
+import { Button } from '@/components/ui/Button'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -16,12 +21,36 @@ const fadeInUp = {
 } as const
 
 function AppContent() {
-  const { isSidebarOpen, setSidebarOpen, isFilesPanelOpen, setFilesPanelOpen, currentProject, currentChat } = useStore()
+  const { isSidebarOpen, setSidebarOpen, isFilesPanelOpen, setFilesPanelOpen, currentProject, currentChat, settings, completeOnboarding } = useStore()
   const [mounted, setMounted] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
+
+  useSidebarShortcut()
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // Show onboarding if not completed and no projects exist
+    if (!settings.hasCompletedOnboarding) {
+      setShowOnboarding(true)
+    }
+  }, [settings.hasCompletedOnboarding])
+
+  const handleOnboardingComplete = () => {
+    completeOnboarding()
+    setShowOnboarding(false)
+  }
+
+  const handleSplashComplete = () => {
+    setShowSplash(false)
+    if (!settings.hasCompletedOnboarding) {
+      setShowOnboarding(true)
+    }
+  }
+
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />
+  }
 
   if (!mounted) {
     return (
@@ -42,9 +71,18 @@ function AppContent() {
   }
 
   return (
-    <div className="fixed inset-0 flex bg-background overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="fixed inset-0 flex bg-background overflow-hidden"
+    >
       {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
+      <AnimatePresence mode="wait">
+        {isSidebarOpen && (
+          <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className={cn(
@@ -53,20 +91,25 @@ function AppContent() {
       )}>
         {/* Top Bar */}
         <header className="flex items-center justify-between h-12 px-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
-          <div className="flex items-center gap-3">
-            <button
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainerVariants}
+            className="flex items-center gap-3"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-surfaceHover transition-colors"
+              className="lg:hidden"
               aria-label={isSidebarOpen ? 'Fechar menu' : 'Abrir menu'}
             >
               <ChevronLeft className="w-5 h-5" />
-            </button>
+            </Button>
 
             {currentProject && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2, delay: 0.05 }}
+                variants={fadeInUpVariants}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
               >
                 <FolderOpen className="w-4 h-4 text-textSecondary" />
@@ -76,34 +119,31 @@ function AppContent() {
 
             {currentChat && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2, delay: 0.1 }}
+                variants={fadeInUpVariants}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
               >
                 <FileText className="w-4 h-4 text-textSecondary" />
                 <span className="text-sm font-medium text-textPrimary truncate max-w-[250px]">{currentChat.title}</span>
               </motion.div>
             )}
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-2">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainerVariants}
+            className="flex items-center gap-2"
+          >
+            <Button
+              variant={isFilesPanelOpen ? 'subtle' : 'ghost'}
+              size="icon"
               onClick={() => setFilesPanelOpen(!isFilesPanelOpen)}
-              className={cn(
-                'p-2 rounded-lg transition-colors',
-                isFilesPanelOpen
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-textSecondary hover:bg-surfaceHover hover:text-textPrimary'
-              )}
               aria-label="Arquivos gerados"
             >
               <FileText className="w-5 h-5" />
-            </motion.button>
+            </Button>
             <ThemeSelector />
-          </div>
+          </motion.div>
         </header>
 
         {/* Chat Area */}
@@ -113,12 +153,19 @@ function AppContent() {
         />
 
         {/* Files Panel */}
-        <FilesPanel
-          isOpen={isFilesPanelOpen}
-          onClose={() => setFilesPanelOpen(false)}
-        />
+        <AnimatePresence mode="wait">
+          {isFilesPanelOpen && (
+            <FilesPanel
+              isOpen={isFilesPanelOpen}
+              onClose={() => setFilesPanelOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Onboarding */}
+        <Onboarding isOpen={showOnboarding} onClose={handleOnboardingComplete} />
       </main>
-    </div>
+    </motion.div>
   )
 }
 

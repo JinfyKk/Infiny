@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { springTransition } from '@/lib/transitions'
 
 export interface Toast {
   id: string
@@ -73,14 +74,14 @@ export function useToastHelpers() {
 }
 
 const toastVariants = {
-  initial: { opacity: 0, x: 300, scale: 0.95 },
-  animate: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring' as const, stiffness: 400, damping: 30 } },
-  exit: { opacity: 0, x: 300, scale: 0.95, transition: { duration: 0.2, ease: 'easeIn' as const } }
+  hidden: { opacity: 0, x: 300, scale: 0.95 },
+  visible: { opacity: 1, x: 0, scale: 1, transition: springTransition.smooth },
+  exit: { opacity: 0, x: 300, scale: 0.95, transition: { duration: 0.2, ease: 'easeIn' } }
 } as const
 
 const iconVariants = {
-  initial: { opacity: 0, scale: 0.5 },
-  animate: { opacity: 1, scale: 1, transition: { type: 'spring' as const, stiffness: 500, damping: 20, delay: 0.1 } }
+  hidden: { opacity: 0, scale: 0.5 },
+  visible: { opacity: 1, scale: 1, transition: { ...springTransition.snappy, delay: 0.1 } }
 } as const
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }) {
@@ -119,16 +120,17 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   return (
     <motion.div
       variants={toastVariants}
-      initial="initial"
-      animate="animate"
+      initial="hidden"
+      animate="visible"
       exit="exit"
       className={cn(
         'pointer-events-auto flex items-start gap-3 w-[320px] max-w-[90vw] p-4 rounded-xl border shadow-xl',
+        'glass',
         bgColors[toast.type]
       )}
       role="alert"
     >
-      <motion.div variants={iconVariants} initial="initial" animate="animate" className="flex-shrink-0 mt-0.5">
+      <motion.div variants={iconVariants} initial="hidden" animate="visible" className="flex-shrink-0 mt-0.5">
         {icons[toast.type]}
       </motion.div>
       <div className="flex-1 min-w-0">

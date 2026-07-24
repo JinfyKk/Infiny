@@ -1,41 +1,48 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { themes, type ThemeName, type ThemeTokens, applyThemeToDOM, defaultTheme } from './themes'
+import { type ThemeName, defaultTheme } from './themes'
+import { applyThemeToDOM as applyDSTheme } from '@/design-system/themes'
 
 interface ThemeContextValue {
   theme: ThemeName
-  tokens: ThemeTokens
   setTheme: (theme: ThemeName) => void
   availableThemes: ThemeName[]
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
+// Apply default theme immediately to prevent flash
+if (typeof window !== 'undefined') {
+  applyDSTheme(defaultTheme)
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(defaultTheme)
-  const [mounted, setMounted] = useState(false)
-
-  const tokens = useMemo(() => themes[theme], [theme])
 
   useEffect(() => {
-    setMounted(true)
-    // Ler do localStorage (persistido pelo Zustand)
+    // Read persisted theme from localStorage
     const stored = localStorage.getItem('infiny-storage')
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        if (parsed.state?.settings?.theme) {
-          setThemeState(parsed.state.settings.theme)
+        const savedTheme = parsed.state?.settings?.theme
+        if (savedTheme) {
+          setThemeState(savedTheme)
+          applyDSTheme(savedTheme)
+        } else {
+          applyDSTheme(defaultTheme)
         }
       } catch {
-        // ignore
+        applyDSTheme(defaultTheme)
       }
+    } else {
+      applyDSTheme(defaultTheme)
     }
   }, [])
 
   const setTheme = (newTheme: ThemeName) => {
     setThemeState(newTheme)
-    applyThemeToDOM(newTheme)
-    // Persistir no localStorage
+    applyDSTheme(newTheme)
+    // Persist to localStorage
     const stored = localStorage.getItem('infiny-storage')
     if (stored) {
       try {
@@ -50,12 +57,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  if (!mounted) {
-    return <>{children}</>
-  }
+  // During hydration, provide default theme to avoid mismatch
+  const value = useMemo<ThemeContextValue>(() => ({
+    theme,
+    setTheme,
+    availableThemes: ['pampas', 'dark-premium', 'tech-blue', 'natural-green', 'monochrome', 'futuristic'] as ThemeName[],
+  }), [theme])
 
   return (
-    <ThemeContext.Provider value={{ theme, tokens, setTheme, availableThemes: Object.keys(themes) as ThemeName[] }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   )
@@ -64,7 +74,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext)
   if (!context) {
-    throw new Error('useTheme deve ser usado dentro de um ThemeProvider')
+    throw new Error('useTheme must be used within a ThemeProvider')
   }
   return context
 }

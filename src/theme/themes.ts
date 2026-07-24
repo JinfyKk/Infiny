@@ -8,369 +8,605 @@ export type ThemeName =
 
 export interface ThemeTokens {
   // Background
-  bg: string;
-  bgElevated: string;
-  bgOverlay: string;
+  bg: string
+  'bg-elevated': string
+  'bg-overlay': string
 
   // Text
-  text: string;
-  textSecondary: string;
-  textMuted: string;
-  textInverse: string;
+  text: string
+  'text-secondary': string
+  'text-muted': string
+  'text-inverse': string
 
   // Surface
-  surface: string;
-  surfaceHover: string;
-  surfacePressed: string;
-  surfaceBorder: string;
-  surfaceBorderHover: string;
+  surface: string
+  'surface-hover': string
+  'surface-pressed': string
+  'surface-border': string
+  'surface-border-hover': string
 
   // Primary / Accent
-  primary: string;
-  primaryHover: string;
-  primaryPressed: string;
-  primarySoft: string;
-  primaryText: string;
+  primary: string
+  'primary-hover': string
+  'primary-pressed': string
+  'primary-soft': string
+  'primary-text': string
 
   // Status
-  success: string;
-  successSoft: string;
-  warning: string;
-  warningSoft: string;
-  error: string;
-  errorSoft: string;
+  success: string
+  'success-soft': string
+  warning: string
+  'warning-soft': string
+  error: string
+  'error-soft': string
 
-  // Glass
-  glassBg: string;
-  glassBorder: string;
+  // Glass / Liquid Glass System
+  'glass-bg': string
+  'glass-border': string
+  'glass-bg-hover': string
+  'glass-border-hover': string
+  'glass-shadow': string
+  'glass-shadow-hover': string
+  'glass-blur': string
+  'glass-blur-hover': string
+
+  // Glass Depth Levels (1-4)
+  // Level 1: Subtle surface
+  'glass-l1-bg': string
+  'glass-l1-border': string
+  'glass-l1-shadow': string
+  'glass-l1-blur': string
+  // Level 2: Elevated card
+  'glass-l2-bg': string
+  'glass-l2-border': string
+  'glass-l2-shadow': string
+  'glass-l2-blur': string
+  // Level 3: Floating panel/dropdown
+  'glass-l3-bg': string
+  'glass-l3-border': string
+  'glass-l3-shadow': string
+  'glass-l3-blur': string
+  // Level 4: Modal/overlay
+  'glass-l4-bg': string
+  'glass-l4-border': string
+  'glass-l4-shadow': string
+  'glass-l4-blur': string
 
   // Focus
-  focusRing: string;
+  'focus-ring': string
+  'focus-ring-offset': string
 
   // Radius
-  radiusSm: string;
-  radiusMd: string;
-  radiusLg: string;
-  radiusXl: string;
-  radiusFull: string;
+  'radius-sm': string
+  'radius-md': string
+  'radius-lg': string
+  'radius-xl': string
+  'radius-2xl': string
+  'radius-full': string
 
   // Shadow
-  shadowSm: string;
-  shadowMd: string;
-  shadowLg: string;
-  shadowXl: string;
+  'shadow-sm': string
+  'shadow-md': string
+  'shadow-lg': string
+  'shadow-xl': string
 
   // Transition
-  transitionFast: string;
-  transitionNormal: string;
-  transitionSlow: string;
+  'transition-fast': string
+  'transition-normal': string
+  'transition-slow': string
+  'transition-spring': string
+
+  // Animation
+  'anim-duration-fast': string
+  'anim-duration-normal': string
+  'anim-duration-slow': string
+  'anim-easing-standard': string
+  'anim-easing-spring': string
 }
 
 export const themes: Record<ThemeName, ThemeTokens> = {
   // --- Pampas / Terracota (Obrigatório) ---
   pampas: {
     bg: '#F4F3EE',
-    bgElevated: '#FFFFFF',
-    bgOverlay: 'rgba(20, 20, 19, 0.4)',
+    'bg-elevated': '#FFFFFF',
+    'bg-overlay': 'rgba(20, 20, 19, 0.4)',
 
     text: '#141413',
-    textSecondary: '#B1ADA1',
-    textMuted: '#8A887E',
-    textInverse: '#F4F3EE',
+    'text-secondary': '#B1ADA1',
+    'text-muted': '#8A887E',
+    'text-inverse': '#F4F3EE',
 
     surface: '#E8E6DC',
-    surfaceHover: '#DCDAE0',
-    surfacePressed: '#CFCBC1',
-    surfaceBorder: '#CFCBC1',
-    surfaceBorderHover: '#B1ADA1',
+    'surface-hover': '#DCDAE0',
+    'surface-pressed': '#CFCBC1',
+    'surface-border': '#CFCBC1',
+    'surface-border-hover': '#B1ADA1',
 
     primary: '#C15F3C',
-    primaryHover: '#A85234',
-    primaryPressed: '#8F472D',
-    primarySoft: '#F5E8E3',
-    primaryText: '#FFFFFF',
+    'primary-hover': '#A85234',
+    'primary-pressed': '#8F472D',
+    'primary-soft': '#F5E8E3',
+    'primary-text': '#FFFFFF',
 
     success: '#4A7C59',
-    successSoft: '#E5F0E7',
+    'success-soft': '#E5F0E7',
     warning: '#C18A3C',
-    warningSoft: '#F5EDE3',
+    'warning-soft': '#F5EDE3',
     error: '#C15F3C',
-    errorSoft: '#F5E8E3',
+    'error-soft': '#F5E8E3',
 
-    glassBg: 'rgba(232, 230, 220, 0.85)',
-    glassBorder: 'rgba(20, 20, 19, 0.08)',
+    'glass-bg': 'rgba(232, 230, 220, 0.72)',
+    'glass-border': 'rgba(20, 20, 19, 0.06)',
+    'glass-bg-hover': 'rgba(232, 230, 220, 0.88)',
+    'glass-border-hover': 'rgba(20, 20, 19, 0.1)',
+    'glass-shadow': '0 4px 24px -4px rgba(20, 20, 19, 0.08), 0 2px 8px -2px rgba(20, 20, 19, 0.05)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(20, 20, 19, 0.12), 0 4px 16px -4px rgba(20, 20, 19, 0.08)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
 
-    focusRing: '#C15F3C',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(232, 230, 220, 0.56)',
+    'glass-l1-border': 'rgba(20, 20, 19, 0.04)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(20, 20, 19, 0.04)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(232, 230, 220, 0.72)',
+    'glass-l2-border': 'rgba(20, 20, 19, 0.06)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(20, 20, 19, 0.06), 0 2px 6px -2px rgba(20, 20, 19, 0.04)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(232, 230, 220, 0.82)',
+    'glass-l3-border': 'rgba(20, 20, 19, 0.08)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(20, 20, 19, 0.1), 0 4px 16px -4px rgba(20, 20, 19, 0.06)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(232, 230, 220, 0.9)',
+    'glass-l4-border': 'rgba(20, 20, 19, 0.1)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(20, 20, 19, 0.14), 0 8px 24px -6px rgba(20, 20, 19, 0.08)',
+    'glass-l4-blur': '40px',
 
-    radiusSm: '0.25rem',
-    radiusMd: '0.5rem',
-    radiusLg: '0.75rem',
-    radiusXl: '1rem',
-    radiusFull: '9999px',
+    'focus-ring': '#C15F3C',
+    'focus-ring-offset': '#F4F3EE',
 
-    shadowSm: '0 1px 2px 0 rgba(20, 20, 19, 0.05)',
-    shadowMd: '0 4px 6px -1px rgba(20, 20, 19, 0.1), 0 2px 4px -2px rgba(20, 20, 19, 0.1)',
-    shadowLg: '0 10px 15px -3px rgba(20, 20, 19, 0.1), 0 4px 6px -4px rgba(20, 20, 19, 0.1)',
-    shadowXl: '0 20px 25px -5px rgba(20, 20, 19, 0.1), 0 8px 10px -6px rgba(20, 20, 19, 0.1)',
+    'radius-sm': '0.25rem',
+    'radius-md': '0.5rem',
+    'radius-lg': '0.75rem',
+    'radius-xl': '1rem',
+    'radius-2xl': '1.25rem',
+    'radius-full': '9999px',
 
-    transitionFast: '100ms ease-out',
-    transitionNormal: '150ms ease-out',
-    transitionSlow: '200ms ease-out',
+    'shadow-sm': '0 1px 2px 0 rgba(20, 20, 19, 0.05)',
+    'shadow-md': '0 4px 6px -1px rgba(20, 20, 19, 0.1), 0 2px 4px -2px rgba(20, 20, 19, 0.1)',
+    'shadow-lg': '0 10px 15px -3px rgba(20, 20, 19, 0.1), 0 4px 6px -4px rgba(20, 20, 19, 0.1)',
+    'shadow-xl': '0 20px 25px -5px rgba(20, 20, 19, 0.1), 0 8px 10px -6px rgba(20, 20, 19, 0.1)',
+
+    'transition-fast': '100ms ease-out',
+    'transition-normal': '150ms ease-out',
+    'transition-slow': '200ms ease-out',
+    'transition-spring': '300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '100ms',
+    'anim-duration-normal': '150ms',
+    'anim-duration-slow': '200ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 
   // --- Dark Premium ---
   'dark-premium': {
     bg: '#0A0A0B',
-    bgElevated: '#131314',
-    bgOverlay: 'rgba(0, 0, 0, 0.6)',
+    'bg-elevated': '#131314',
+    'bg-overlay': 'rgba(0, 0, 0, 0.6)',
 
     text: '#FAFAFA',
-    textSecondary: '#A3A3A3',
-    textMuted: '#737373',
-    textInverse: '#0A0A0B',
+    'text-secondary': '#A3A3A3',
+    'text-muted': '#737373',
+    'text-inverse': '#0A0A0B',
 
     surface: '#1A1A1B',
-    surfaceHover: '#232324',
-    surfacePressed: '#2A2A2B',
-    surfaceBorder: '#2A2A2B',
-    surfaceBorderHover: '#404040',
+    'surface-hover': '#232324',
+    'surface-pressed': '#2A2A2B',
+    'surface-border': '#2A2A2B',
+    'surface-border-hover': '#404040',
 
     primary: '#E8E8E8',
-    primaryHover: '#F5F5F5',
-    primaryPressed: '#D4D4D4',
-    primarySoft: '#2A2A2B',
-    primaryText: '#0A0A0B',
+    'primary-hover': '#F5F5F5',
+    'primary-pressed': '#D4D4D4',
+    'primary-soft': '#2A2A2B',
+    'primary-text': '#0A0A0B',
 
     success: '#4ADE80',
-    successSoft: '#14532D',
+    'success-soft': '#14532D',
     warning: '#FACC15',
-    warningSoft: '#713F12',
+    'warning-soft': '#713F12',
     error: '#F87171',
-    errorSoft: '#7F1D1D',
+    'error-soft': '#7F1D1D',
 
-    glassBg: 'rgba(26, 26, 27, 0.85)',
-    glassBorder: 'rgba(250, 250, 250, 0.06)',
+    'glass-bg': 'rgba(26, 26, 27, 0.72)',
+    'glass-border': 'rgba(250, 250, 250, 0.04)',
+    'glass-bg-hover': 'rgba(26, 26, 27, 0.88)',
+    'glass-border-hover': 'rgba(250, 250, 250, 0.08)',
+    'glass-shadow': '0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.3)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(0, 0, 0, 0.5), 0 4px 16px -4px rgba(0, 0, 0, 0.4)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
 
-    focusRing: '#E8E8E8',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(26, 26, 27, 0.56)',
+    'glass-l1-border': 'rgba(250, 250, 250, 0.02)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(0, 0, 0, 0.2)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(26, 26, 27, 0.72)',
+    'glass-l2-border': 'rgba(250, 250, 250, 0.04)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(0, 0, 0, 0.3), 0 2px 6px -2px rgba(0, 0, 0, 0.2)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(26, 26, 27, 0.82)',
+    'glass-l3-border': 'rgba(250, 250, 250, 0.06)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(0, 0, 0, 0.4), 0 4px 16px -4px rgba(0, 0, 0, 0.3)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(26, 26, 27, 0.92)',
+    'glass-l4-border': 'rgba(250, 250, 250, 0.08)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(0, 0, 0, 0.5), 0 8px 24px -6px rgba(0, 0, 0, 0.4)',
+    'glass-l4-blur': '40px',
 
-    radiusSm: '0.25rem',
-    radiusMd: '0.5rem',
-    radiusLg: '0.75rem',
-    radiusXl: '1rem',
-    radiusFull: '9999px',
+    'focus-ring': '#E8E8E8',
+    'focus-ring-offset': '#0A0A0B',
 
-    shadowSm: '0 1px 2px 0 rgba(0, 0, 0, 0.3)',
-    shadowMd: '0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3)',
-    shadowLg: '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
-    shadowXl: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+    'radius-sm': '0.25rem',
+    'radius-md': '0.5rem',
+    'radius-lg': '0.75rem',
+    'radius-xl': '1rem',
+    'radius-2xl': '1.25rem',
+    'radius-full': '9999px',
 
-    transitionFast: '100ms ease-out',
-    transitionNormal: '150ms ease-out',
-    transitionSlow: '200ms ease-out',
+    'shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.3)',
+    'shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3)',
+    'shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
+    'shadow-xl': '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+
+    'transition-fast': '100ms ease-out',
+    'transition-normal': '150ms ease-out',
+    'transition-slow': '200ms ease-out',
+    'transition-spring': '300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '100ms',
+    'anim-duration-normal': '150ms',
+    'anim-duration-slow': '200ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 
   // --- Tech Blue ---
   'tech-blue': {
     bg: '#061426',
-    bgElevated: '#0C1F3A',
-    bgOverlay: 'rgba(6, 20, 38, 0.7)',
+    'bg-elevated': '#0C1F3A',
+    'bg-overlay': 'rgba(6, 20, 38, 0.7)',
 
     text: '#E8F1FB',
-    textSecondary: '#8BA4C8',
-    textMuted: '#5A7A9E',
-    textInverse: '#061426',
+    'text-secondary': '#8BA4C8',
+    'text-muted': '#5A7A9E',
+    'text-inverse': '#061426',
 
     surface: '#0F2442',
-    surfaceHover: '#152D4E',
-    surfacePressed: '#1A3A5E',
-    surfaceBorder: '#1E3A5F',
-    surfaceBorderHover: '#2A4A6E',
+    'surface-hover': '#152D4E',
+    'surface-pressed': '#1A3A5E',
+    'surface-border': '#1E3A5F',
+    'surface-border-hover': '#2A4A6E',
 
     primary: '#3B9CFF',
-    primaryHover: '#5AAEFF',
-    primaryPressed: '#2A88E6',
-    primarySoft: '#15304E',
-    primaryText: '#061426',
+    'primary-hover': '#5AAEFF',
+    'primary-pressed': '#2A88E6',
+    'primary-soft': '#15304E',
+    'primary-text': '#061426',
 
     success: '#22D39A',
-    successSoft: '#0A3D2E',
+    'success-soft': '#0A3D2E',
     warning: '#F5A623',
-    warningSoft: '#3D2A0A',
+    'warning-soft': '#3D2A0A',
     error: '#FF5A5F',
-    errorSoft: '#3D1516',
+    'error-soft': '#3D1516',
 
-    glassBg: 'rgba(15, 36, 66, 0.85)',
-    glassBorder: 'rgba(59, 156, 255, 0.12)',
+    'glass-bg': 'rgba(15, 36, 66, 0.72)',
+    'glass-border': 'rgba(59, 156, 255, 0.08)',
+    'glass-bg-hover': 'rgba(15, 36, 66, 0.88)',
+    'glass-border-hover': 'rgba(59, 156, 255, 0.14)',
+    'glass-shadow': '0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(59, 156, 255, 0.08)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(0, 0, 0, 0.5), 0 4px 16px -4px rgba(59, 156, 255, 0.12)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
 
-    focusRing: '#3B9CFF',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(15, 36, 66, 0.56)',
+    'glass-l1-border': 'rgba(59, 156, 255, 0.04)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(0, 0, 0, 0.25)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(15, 36, 66, 0.72)',
+    'glass-l2-border': 'rgba(59, 156, 255, 0.08)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(0, 0, 0, 0.35), 0 2px 6px -2px rgba(59, 156, 255, 0.06)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(15, 36, 66, 0.82)',
+    'glass-l3-border': 'rgba(59, 156, 255, 0.12)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(0, 0, 0, 0.4), 0 4px 16px -4px rgba(59, 156, 255, 0.1)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(15, 36, 66, 0.92)',
+    'glass-l4-border': 'rgba(59, 156, 255, 0.16)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(0, 0, 0, 0.45), 0 8px 24px -6px rgba(59, 156, 255, 0.14)',
+    'glass-l4-blur': '40px',
 
-    radiusSm: '0.1875rem',
-    radiusMd: '0.375rem',
-    radiusLg: '0.5rem',
-    radiusXl: '0.75rem',
-    radiusFull: '9999px',
+    'focus-ring': '#3B9CFF',
+    'focus-ring-offset': '#061426',
 
-    shadowSm: '0 1px 2px 0 rgba(0, 0, 0, 0.4)',
-    shadowMd: '0 4px 8px -2px rgba(59, 156, 255, 0.15), 0 2px 4px -1px rgba(0, 0, 0, 0.3)',
-    shadowLg: '0 12px 24px -4px rgba(59, 156, 255, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.3)',
-    shadowXl: '0 24px 48px -8px rgba(59, 156, 255, 0.1), 0 8px 16px -4px rgba(0, 0, 0, 0.3)',
+    'radius-sm': '0.1875rem',
+    'radius-md': '0.375rem',
+    'radius-lg': '0.5rem',
+    'radius-xl': '0.75rem',
+    'radius-2xl': '1rem',
+    'radius-full': '9999px',
 
-    transitionFast: '80ms ease-out',
-    transitionNormal: '120ms ease-out',
-    transitionSlow: '160ms ease-out',
+    'shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.4)',
+    'shadow-md': '0 4px 8px -2px rgba(59, 156, 255, 0.15), 0 2px 4px -1px rgba(0, 0, 0, 0.3)',
+    'shadow-lg': '0 12px 24px -4px rgba(59, 156, 255, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.3)',
+    'shadow-xl': '0 24px 48px -8px rgba(59, 156, 255, 0.1), 0 8px 16px -4px rgba(0, 0, 0, 0.3)',
+
+    'transition-fast': '80ms ease-out',
+    'transition-normal': '120ms ease-out',
+    'transition-slow': '160ms ease-out',
+    'transition-spring': '250ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '80ms',
+    'anim-duration-normal': '120ms',
+    'anim-duration-slow': '160ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 
   // --- Natural Green ---
   'natural-green': {
     bg: '#F1F5EF',
-    bgElevated: '#FFFFFF',
-    bgOverlay: 'rgba(22, 42, 22, 0.4)',
+    'bg-elevated': '#FFFFFF',
+    'bg-overlay': 'rgba(22, 42, 22, 0.4)',
 
     text: '#162A16',
-    textSecondary: '#6B8B6B',
-    textMuted: '#8FA58F',
-    textInverse: '#F1F5EF',
+    'text-secondary': '#6B8B6B',
+    'text-muted': '#8FA58F',
+    'text-inverse': '#F1F5EF',
 
     surface: '#E4ECE0',
-    surfaceHover: '#D6E0D4',
-    surfacePressed: '#C8D4C7',
-    surfaceBorder: '#BCD0BA',
-    surfaceBorderHover: '#9EB89E',
+    'surface-hover': '#D6E0D4',
+    'surface-pressed': '#C8D4C7',
+    'surface-border': '#BCD0BA',
+    'surface-border-hover': '#9EB89E',
 
     primary: '#2E7D32',
-    primaryHover: '#256628',
-    primaryPressed: '#1D4F1E',
-    primarySoft: '#E8F3E8',
-    primaryText: '#FFFFFF',
+    'primary-hover': '#256628',
+    'primary-pressed': '#1D4F1E',
+    'primary-soft': '#E8F3E8',
+    'primary-text': '#FFFFFF',
 
     success: '#388E3C',
-    successSoft: '#E8F5E9',
+    'success-soft': '#E8F5E9',
     warning: '#C8962E',
-    warningSoft: '#F5F0E0',
+    'warning-soft': '#F5F0E0',
     error: '#C62828',
-    errorSoft: '#FCEEEE',
+    'error-soft': '#FCEEEE',
 
-    glassBg: 'rgba(228, 236, 224, 0.85)',
-    glassBorder: 'rgba(22, 42, 22, 0.08)',
+    'glass-bg': 'rgba(228, 236, 224, 0.72)',
+    'glass-border': 'rgba(22, 42, 22, 0.06)',
+    'glass-bg-hover': 'rgba(228, 236, 224, 0.88)',
+    'glass-border-hover': 'rgba(22, 42, 22, 0.1)',
+    'glass-shadow': '0 4px 24px -4px rgba(22, 42, 22, 0.08), 0 2px 8px -2px rgba(22, 42, 22, 0.05)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(22, 42, 22, 0.12), 0 4px 16px -4px rgba(22, 42, 22, 0.08)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
 
-    focusRing: '#2E7D32',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(228, 236, 224, 0.56)',
+    'glass-l1-border': 'rgba(22, 42, 22, 0.04)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(22, 42, 22, 0.04)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(228, 236, 224, 0.72)',
+    'glass-l2-border': 'rgba(22, 42, 22, 0.06)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(22, 42, 22, 0.06), 0 2px 6px -2px rgba(22, 42, 22, 0.04)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(228, 236, 224, 0.82)',
+    'glass-l3-border': 'rgba(22, 42, 22, 0.08)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(22, 42, 22, 0.1), 0 4px 16px -4px rgba(22, 42, 22, 0.06)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(228, 236, 224, 0.9)',
+    'glass-l4-border': 'rgba(22, 42, 22, 0.1)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(22, 42, 22, 0.14), 0 8px 24px -6px rgba(22, 42, 22, 0.08)',
+    'glass-l4-blur': '40px',
 
-    radiusSm: '0.3125rem',
-    radiusMd: '0.625rem',
-    radiusLg: '0.9375rem',
-    radiusXl: '1.25rem',
-    radiusFull: '9999px',
+    'focus-ring': '#2E7D32',
+    'focus-ring-offset': '#F1F5EF',
 
-    shadowSm: '0 1px 2px 0 rgba(22, 42, 22, 0.06)',
-    shadowMd: '0 4px 8px -2px rgba(22, 42, 22, 0.1), 0 2px 4px -1px rgba(22, 42, 22, 0.08)',
-    shadowLg: '0 12px 24px -4px rgba(22, 42, 22, 0.12), 0 4px 8px -2px rgba(22, 42, 22, 0.08)',
-    shadowXl: '0 24px 48px -8px rgba(22, 42, 22, 0.15), 0 8px 16px -4px rgba(22, 42, 22, 0.1)',
+    'radius-sm': '0.3125rem',
+    'radius-md': '0.625rem',
+    'radius-lg': '0.9375rem',
+    'radius-xl': '1.25rem',
+    'radius-2xl': '1.5rem',
+    'radius-full': '9999px',
 
-    transitionFast: '120ms ease-out',
-    transitionNormal: '180ms ease-out',
-    transitionSlow: '240ms ease-out',
+    'shadow-sm': '0 1px 2px 0 rgba(22, 42, 22, 0.06)',
+    'shadow-md': '0 4px 8px -2px rgba(22, 42, 22, 0.1), 0 2px 4px -1px rgba(22, 42, 22, 0.08)',
+    'shadow-lg': '0 12px 24px -4px rgba(22, 42, 22, 0.12), 0 4px 8px -2px rgba(22, 42, 22, 0.08)',
+    'shadow-xl': '0 24px 48px -8px rgba(22, 42, 22, 0.15), 0 8px 16px -4px rgba(22, 42, 22, 0.1)',
+
+    'transition-fast': '120ms ease-out',
+    'transition-normal': '180ms ease-out',
+    'transition-slow': '240ms ease-out',
+    'transition-spring': '350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '120ms',
+    'anim-duration-normal': '180ms',
+    'anim-duration-slow': '240ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 
   // --- Monochrome ---
   monochrome: {
     bg: '#FFFFFF',
-    bgElevated: '#FAFAFA',
-    bgOverlay: 'rgba(0, 0, 0, 0.4)',
+    'bg-elevated': '#FAFAFA',
+    'bg-overlay': 'rgba(0, 0, 0, 0.4)',
 
     text: '#000000',
-    textSecondary: '#666666',
-    textMuted: '#999999',
-    textInverse: '#FFFFFF',
+    'text-secondary': '#666666',
+    'text-muted': '#999999',
+    'text-inverse': '#FFFFFF',
 
     surface: '#F5F5F5',
-    surfaceHover: '#EEEEEE',
-    surfacePressed: '#E0E0E0',
-    surfaceBorder: '#E0E0E0',
-    surfaceBorderHover: '#CCCCCC',
+    'surface-hover': '#EEEEEE',
+    'surface-pressed': '#E0E0E0',
+    'surface-border': '#E0E0E0',
+    'surface-border-hover': '#CCCCCC',
 
     primary: '#000000',
-    primaryHover: '#1A1A1A',
-    primaryPressed: '#333333',
-    primarySoft: '#F5F5F5',
-    primaryText: '#FFFFFF',
+    'primary-hover': '#1A1A1A',
+    'primary-pressed': '#333333',
+    'primary-soft': '#F5F5F5',
+    'primary-text': '#FFFFFF',
 
     success: '#006600',
-    successSoft: '#E8F5E8',
+    'success-soft': '#E8F5E8',
     warning: '#996600',
-    warningSoft: '#F5F0E0',
+    'warning-soft': '#F5F0E0',
     error: '#CC0000',
-    errorSoft: '#FCEEEE',
+    'error-soft': '#FCEEEE',
 
-    glassBg: 'rgba(245, 245, 245, 0.85)',
-    glassBorder: 'rgba(0, 0, 0, 0.06)',
+    'glass-bg': 'rgba(245, 245, 245, 0.72)',
+    'glass-border': 'rgba(0, 0, 0, 0.04)',
+    'glass-bg-hover': 'rgba(245, 245, 245, 0.88)',
+    'glass-border-hover': 'rgba(0, 0, 0, 0.08)',
+    'glass-shadow': '0 4px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(0, 0, 0, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.06)',
+    'glass-blur': '20px',
+    'glass-blur-hover': '28px',
 
-    focusRing: '#000000',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(245, 245, 245, 0.5)',
+    'glass-l1-border': 'rgba(0, 0, 0, 0.02)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(0, 0, 0, 0.03)',
+    'glass-l1-blur': '12px',
+    'glass-l2-bg': 'rgba(245, 245, 245, 0.72)',
+    'glass-l2-border': 'rgba(0, 0, 0, 0.04)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(0, 0, 0, 0.05), 0 2px 6px -2px rgba(0, 0, 0, 0.03)',
+    'glass-l2-blur': '20px',
+    'glass-l3-bg': 'rgba(245, 245, 245, 0.82)',
+    'glass-l3-border': 'rgba(0, 0, 0, 0.06)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(0, 0, 0, 0.08), 0 4px 16px -4px rgba(0, 0, 0, 0.05)',
+    'glass-l3-blur': '28px',
+    'glass-l4-bg': 'rgba(245, 245, 245, 0.92)',
+    'glass-l4-border': 'rgba(0, 0, 0, 0.08)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(0, 0, 0, 0.12), 0 8px 24px -6px rgba(0, 0, 0, 0.06)',
+    'glass-l4-blur': '36px',
 
-    radiusSm: '0.125rem',
-    radiusMd: '0.25rem',
-    radiusLg: '0.5rem',
-    radiusXl: '0.75rem',
-    radiusFull: '9999px',
+    'focus-ring': '#000000',
+    'focus-ring-offset': '#FFFFFF',
 
-    shadowSm: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-    shadowMd: '0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
-    shadowLg: '0 8px 16px -4px rgba(0, 0, 0, 0.08), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-    shadowXl: '0 16px 32px -8px rgba(0, 0, 0, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.04)',
+    'radius-sm': '0.125rem',
+    'radius-md': '0.25rem',
+    'radius-lg': '0.5rem',
+    'radius-xl': '0.75rem',
+    'radius-2xl': '1rem',
+    'radius-full': '9999px',
 
-    transitionFast: '80ms ease',
-    transitionNormal: '120ms ease',
-    transitionSlow: '160ms ease',
+    'shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+    'shadow-md': '0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
+    'shadow-lg': '0 8px 16px -4px rgba(0, 0, 0, 0.08), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+    'shadow-xl': '0 16px 32px -8px rgba(0, 0, 0, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.04)',
+
+    'transition-fast': '80ms ease',
+    'transition-normal': '120ms ease',
+    'transition-slow': '160ms ease',
+    'transition-spring': '250ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '80ms',
+    'anim-duration-normal': '120ms',
+    'anim-duration-slow': '160ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 
   // --- Futuristic ---
   futuristic: {
     bg: '#050508',
-    bgElevated: '#0D0D14',
-    bgOverlay: 'rgba(5, 5, 8, 0.8)',
+    'bg-elevated': '#0D0D14',
+    'bg-overlay': 'rgba(5, 5, 8, 0.8)',
 
     text: '#F0F0F5',
-    textSecondary: '#A0A0B0',
-    textMuted: '#6A6A7A',
-    textInverse: '#050508',
+    'text-secondary': '#A0A0B0',
+    'text-muted': '#6A6A7A',
+    'text-inverse': '#050508',
 
     surface: '#12121A',
-    surfaceHover: '#1A1A24',
-    surfacePressed: '#22222E',
-    surfaceBorder: '#2A2A3A',
-    surfaceBorderHover: '#3A3A4A',
+    'surface-hover': '#1A1A24',
+    'surface-pressed': '#22222E',
+    'surface-border': '#2A2A3A',
+    'surface-border-hover': '#3A3A4A',
 
     primary: '#00FFC8',
-    primaryHover: '#33FFD6',
-    primaryPressed: '#00CCA0',
-    primarySoft: '#0A2A24',
-    primaryText: '#050508',
+    'primary-hover': '#33FFD6',
+    'primary-pressed': '#00CCA0',
+    'primary-soft': '#0A2A24',
+    'primary-text': '#050508',
 
     success: '#00FF88',
-    successSoft: '#0A2A1A',
+    'success-soft': '#0A2A1A',
     warning: '#FFCC00',
-    warningSoft: '#2A220A',
+    'warning-soft': '#2A220A',
     error: '#FF3366',
-    errorSoft: '#2A0A12',
+    'error-soft': '#2A0A12',
 
-    glassBg: 'rgba(18, 18, 26, 0.9)',
-    glassBorder: 'rgba(0, 255, 200, 0.15)',
+    'glass-bg': 'rgba(18, 18, 26, 0.8)',
+    'glass-border': 'rgba(0, 255, 200, 0.1)',
+    'glass-bg-hover': 'rgba(18, 18, 26, 0.92)',
+    'glass-border-hover': 'rgba(0, 255, 200, 0.18)',
+    'glass-shadow': '0 4px 24px -4px rgba(0, 255, 200, 0.08), 0 2px 8px -2px rgba(0, 0, 0, 0.4)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(0, 255, 200, 0.12), 0 4px 16px -4px rgba(0, 0, 0, 0.5)',
+    'glass-blur': '28px',
+    'glass-blur-hover': '36px',
 
-    focusRing: '#00FFC8',
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(18, 18, 26, 0.6)',
+    'glass-l1-border': 'rgba(0, 255, 200, 0.04)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(0, 0, 0, 0.3)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(18, 18, 26, 0.8)',
+    'glass-l2-border': 'rgba(0, 255, 200, 0.1)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(0, 255, 200, 0.06), 0 2px 6px -2px rgba(0, 0, 0, 0.3)',
+    'glass-l2-blur': '28px',
+    'glass-l3-bg': 'rgba(18, 18, 26, 0.9)',
+    'glass-l3-border': 'rgba(0, 255, 200, 0.14)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(0, 255, 200, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.4)',
+    'glass-l3-blur': '36px',
+    'glass-l4-bg': 'rgba(18, 18, 26, 0.96)',
+    'glass-l4-border': 'rgba(0, 255, 200, 0.18)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(0, 255, 200, 0.14), 0 8px 24px -6px rgba(0, 0, 0, 0.5)',
+    'glass-l4-blur': '48px',
 
-    radiusSm: '0.125rem',
-    radiusMd: '0.375rem',
-    radiusLg: '0.625rem',
-    radiusXl: '1rem',
-    radiusFull: '9999px',
+    'focus-ring': '#00FFC8',
+    'focus-ring-offset': '#050508',
 
-    shadowSm: '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
-    shadowMd: '0 4px 12px -2px rgba(0, 255, 200, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.4)',
-    shadowLg: '0 16px 32px -4px rgba(0, 255, 200, 0.1), 0 8px 16px -4px rgba(0, 0, 0, 0.4)',
-    shadowXl: '0 32px 64px -8px rgba(0, 255, 200, 0.12), 0 16px 32px -8px rgba(0, 0, 0, 0.4)',
+    'radius-sm': '0.125rem',
+    'radius-md': '0.375rem',
+    'radius-lg': '0.625rem',
+    'radius-xl': '1rem',
+    'radius-2xl': '1.25rem',
+    'radius-full': '9999px',
 
-    transitionFast: '60ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transitionNormal: '100ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transitionSlow: '150ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+    'shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
+    'shadow-md': '0 4px 12px -2px rgba(0, 255, 200, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.4)',
+    'shadow-lg': '0 16px 32px -4px rgba(0, 255, 200, 0.1), 0 8px 16px -4px rgba(0, 0, 0, 0.4)',
+    'shadow-xl': '0 32px 64px -8px rgba(0, 255, 200, 0.12), 0 16px 32px -8px rgba(0, 0, 0, 0.4)',
+
+    'transition-fast': '60ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+    'transition-normal': '100ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+    'transition-slow': '150ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+    'transition-spring': '200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '60ms',
+    'anim-duration-normal': '100ms',
+    'anim-duration-slow': '150ms',
+    'anim-easing-standard': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
 };
 

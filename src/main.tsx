@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { ThemeProvider } from './theme'
 import { ToastProvider } from '@/components/ui/Toast'
-import './index.css'
+import '@/design-system'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

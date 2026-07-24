@@ -99,11 +99,13 @@ export class ProcessManager extends EventEmitter {
         // Setup stdout/stderr forwarding
         child.stdout?.on('data', (data: Buffer) => {
           const output = data.toString()
+          console.log('[ProcessManager] stdout raw - process:', name, 'length:', output.length, 'preview:', output.substring(0, 100))
           this.emit('process-output', name, output)
         })
 
         child.stderr?.on('data', (data: Buffer) => {
           const error = data.toString()
+          console.log('[ProcessManager] stderr raw - process:', name, 'length:', error.length, 'preview:', error.substring(0, 100))
           this.emit('process-output', name, error) // stderr também vai para output
         })
 
@@ -277,12 +279,26 @@ export class ProcessManager extends EventEmitter {
   writeToProcess(name: string, data: string): boolean {
     const child = this.getProcess(name)
     if (!child || !child.stdin?.writable) {
+      console.warn('[ProcessManager] writeToProcess - FAILED:', {
+        processName: name,
+        childExists: !!child,
+        stdinExists: !!child?.stdin,
+        stdinWritable: !!child?.stdin?.writable,
+      })
       return false
     }
     try {
-      child.stdin.write(data)
+      const bytesWritten = child.stdin.write(data)
+      console.log('[ProcessManager] writeToProcess - SUCCESS:', {
+        processName: name,
+        bytesWritten,
+      })
       return true
-    } catch {
+    } catch (error) {
+      console.warn('[ProcessManager] writeToProcess - EXCEPTION:', {
+        processName: name,
+        error: error instanceof Error ? error.message : String(error),
+      })
       return false
     }
   }

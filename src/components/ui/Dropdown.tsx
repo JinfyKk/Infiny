@@ -1,240 +1,271 @@
-import React, { useRef, useEffect, useState } from 'react'
+'use client'
+
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Check } from 'lucide-react'
+import {
+  dropdownVariants,
+  dropdownItemVariants,
+  staggerContainerVariants,
+  transitions,
+} from '@/lib/transitions'
 
 export interface DropdownOption {
   value: string
   label: string
+  description?: string
   icon?: React.ReactNode
   disabled?: boolean
   danger?: boolean
 }
 
 interface DropdownProps {
-  trigger: React.ReactNode
+  value: string
+  onChange: (value: string) => void
   options: DropdownOption[]
-  onSelect: (value: string) => void
-  selectedValue?: string
+  triggerLabel: string
+  triggerIcon?: React.ReactNode
   placeholder?: string
-  align?: 'left' | 'right'
+  disabled?: boolean
+  ariaLabel?: string
+  minWidth?: number
+  maxHeight?: number
+  triggerClassName?: string
   className?: string
 }
 
-export function Dropdown({ trigger, options, onSelect, selectedValue, placeholder, align = 'left', className }: DropdownProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+export function Dropdown({
+  value,
+  onChange,
+  options,
+  triggerLabel,
+  triggerIcon,
+  placeholder,
+  disabled = false,
+  ariaLabel,
+  minWidth = 200,
+  maxHeight = 300,
+  triggerClassName = '',
+  className,
+}: DropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
-          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
-
-  const handleOptionClick = (value: string) => {
-    onSelect(value)
-    setIsOpen(false)
-  }
-
-  const portalContent = (
-    <div
-      ref={dropdownRef}
-      className={cn(
-        'fixed z-50 mt-1.5 min-w-[180px] max-w-[280px]',
-        align === 'right' ? 'right-0' : 'left-0',
-        className
-      )}
-      role="menu"
-    >
-      <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden animate-in fade-in-150 zoom-in-95 duration-150">
-        {placeholder && (
-          <div className="px-3 py-2 text-sm text-textMuted border-b border-glassBorder">
-            {placeholder}
-          </div>
-        )}
-        <div className="py-1">
-          {options.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => !option.disabled && handleOptionClick(option.value)}
-              disabled={option.disabled}
-              role="menuitem"
-              className={cn(
-                'w-full px-3 py-2 text-left text-sm flex items-center gap-2',
-                'transition-colors duration-100',
-                'hover:bg-surfaceHover',
-                'focus:outline-none focus:bg-surfaceHover',
-                option.danger ? 'text-error' : 'text-textPrimary',
-                option.disabled && 'opacity-50 cursor-not-allowed',
-                selectedValue === option.value && 'bg-primarySoft text-primary'
-              )}
-            >
-              {option.icon && <span className="flex-shrink-0 h-4 w-4">{option.icon}</span>}
-              <span className="flex-1 truncate">{option.label}</span>
-              {selectedValue === option.value && <Check className="h-4 w-4 flex-shrink-0 text-primary" />}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="relative inline-block">
-      <button
-        ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-      >
-        {trigger}
-      </button>
-      {isOpen && createPortal(portalContent, document.body)}
-    </div>
-  )
-}
-
-interface CommandPaletteProps {
-  isOpen: boolean
-  onClose: () => void
-  onSearch: (query: string) => void
-  sections: Array<{
-    title: string
-    items: Array<{
-      label: string
-      description?: string
-      shortcut?: string
-      action: () => void
-      icon?: React.ReactNode
-    }>
-  }>
-}
-
-export function CommandPalette({ isOpen, onClose, onSearch, sections }: CommandPaletteProps) {
-  const [query, setQuery] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const itemsRef = useRef<HTMLButtonElement[]>([])
+  const shouldReduceMotion = useReducedMotion()
 
-  const allItems = sections.flatMap((section) => section.items)
+  // Memoize display options
+  const displayOptions = useMemo(() => options.length > 0 ? options : [], [options])
 
   useEffect(() => {
+    const idx = displayOptions.findIndex((o) => o.value === value)
+    setSelectedIndex(idx >= 0 ? idx : 0)
+  }, [value, displayOptions])
+
+  const toggle = useCallback(() => {
+    if (!disabled) setIsOpen((prev) => !prev)
+  }, [disabled])
+
+  const close = useCallback(() => setIsOpen(false), [])
+
+  const handleSelect = useCallback(
+    (optionValue: string) => {
+      const option = displayOptions.find((o) => o.value === optionValue)
+      if (option && !option.disabled) {
+        onChange(optionValue)
+      }
+      close()
+    },
+    [displayOptions, onChange, close]
+  )
+
+  // Click outside to close
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !event.composedPath().includes(triggerRef.current)
+      ) {
+        close()
+      }
+    }
+
     if (isOpen) {
-      setQuery('')
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 0)
+      // Use setTimeout to avoid race condition between click and mousedown
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('touchstart', handleClickOutside, { passive: true })
+      }, 0)
+      return () => {
+        clearTimeout(timer)
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('touchstart', handleClickOutside)
+      }
+    }
+  }, [isOpen, close])
+
+  // Keyboard navigation
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!isOpen) return
+
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault()
+          setSelectedIndex((prev) => Math.min(prev + 1, displayOptions.length - 1))
+          break
+        case 'ArrowUp':
+          event.preventDefault()
+          setSelectedIndex((prev) => Math.max(prev - 1, 0))
+          break
+        case 'Enter':
+        case ' ':
+          event.preventDefault()
+          if (displayOptions[selectedIndex] && !displayOptions[selectedIndex].disabled) {
+            handleSelect(displayOptions[selectedIndex].value)
+          }
+          break
+        case 'Escape':
+          close()
+          break
+        case 'Tab':
+          close()
+          break
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+    }
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, displayOptions, selectedIndex, handleSelect, close])
+
+  // Focus trigger when closed
+  useEffect(() => {
+    if (!isOpen && triggerRef.current) {
+      triggerRef.current.focus()
     }
   }, [isOpen])
 
-  useEffect(() => {
-    onSearch(query)
-  }, [query, onSearch])
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const visibleItems = allItems.length
-    if (visibleItems === 0) return
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setSelectedIndex((prev) => (prev + 1) % visibleItems)
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setSelectedIndex((prev) => (prev - 1 + visibleItems) % visibleItems)
-        break
-      case 'Enter':
-        e.preventDefault()
-        allItems[selectedIndex]?.action()
-        onClose()
-        break
-      case 'Escape':
-        onClose()
-        break
-    }
-  }
-
-  if (!isOpen) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" onClick={(e) => e.stopPropagation()} />
-      <div
-        className="relative glass rounded-2xl border border-glassBorder shadow-2xl w-full max-w-2xl max-h-[60vh] overflow-hidden animate-in fade-in-200 zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-4 border-b border-glassBorder">
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Digite um comando ou pesquise..."
-              className="w-full bg-surface/50 border border-border rounded-lg px-4 py-3 text-textPrimary placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-            <kbd className="absolute right-4 top-1/2 -translate-y-1/2 px-2 py-1 bg-surface border border-border rounded text-xs text-textMuted font-mono">Esc</kbd>
+  const portalContent = isOpen ? (
+    <motion.div
+      ref={dropdownRef}
+      variants={dropdownVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      transition={shouldReduceMotion ? { duration: 0 } : undefined}
+      className={cn(
+        'fixed z-50 mt-1.5',
+        `min-w-[${minWidth}px] max-h-[${maxHeight}px]`,
+        className
+      )}
+      role="menu"
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">
+        {placeholder && (
+          <div className="px-3 py-2 border-b border-glassBorder bg-surface/50">
+            <span className="text-xs font-semibold text-textMuted uppercase tracking-wider">
+              {placeholder}
+            </span>
           </div>
-        </div>
-        <div className="max-h-[calc(60vh-80px)] overflow-y-auto p-2">
-          {sections.map((section, sectionIndex) => (
-            <div key={section.title} className="mb-4">
-              <h3 className="px-3 py-1 text-xs font-semibold text-textMuted uppercase tracking-wider">{section.title}</h3>
-              {section.items.map((item, itemIndex) => {
-                const globalIndex = sections.slice(0, sectionIndex).reduce((acc, s) => acc + s.items.length, 0) + itemIndex
-                const isSelected = globalIndex === selectedIndex
-                return (
-                  <button
-                    key={item.label}
-                    ref={(el) => { itemsRef.current[globalIndex] = el! }}
-                    onClick={() => { item.action(); onClose() }}
-                    onMouseEnter={() => setSelectedIndex(globalIndex)}
-                    className={cn(
-                      'w-full px-3 py-2.5 rounded-lg flex items-center gap-3 text-sm transition-colors duration-100',
-                      'hover:bg-surfaceHover',
-                      isSelected && 'bg-primarySoft text-primary'
-                    )}
-                  >
-                    {item.icon && <span className="flex-shrink-0 h-4 w-4 text-textMuted">{item.icon}</span>}
-                    <div className="flex-1 min-w-0">
-                      <span className={cn('truncate block', isSelected ? 'text-textPrimary' : 'text-textSecondary')}>{item.label}</span>
-                      {item.description && (
-                        <span className="truncate block text-xs text-textMuted">{item.description}</span>
-                      )}
-                    </div>
-                    {item.shortcut && (
-                      <kbd className="flex-shrink-0 px-2 py-0.5 bg-surface border border-border rounded text-xs text-textMuted font-mono">{item.shortcut}</kbd>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+        )}
+        <motion.div
+          className="py-1 overflow-y-auto"
+          role="menu"
+          variants={staggerContainerVariants}
+          initial="hidden"
+          animate="visible"
+          transition={shouldReduceMotion ? { duration: 0 } : undefined}
+        >
+          {displayOptions.map((option, idx) => (
+            <motion.button
+              key={option.value}
+              role="menuitem"
+              disabled={option.disabled || disabled}
+              onClick={() => !option.disabled && !disabled && handleSelect(option.value)}
+              onMouseEnter={() => setSelectedIndex(idx)}
+              variants={dropdownItemVariants}
+              whileHover={{ x: 4, transition: transitions.snappy }}
+              whileTap={{ scale: 0.98, transition: transitions.tweenFast }}
+              className={cn(
+                'w-full px-3 py-2 text-left flex items-center gap-3 text-sm transition-colors duration-100',
+                'hover:bg-surfaceHover',
+                idx === selectedIndex && 'bg-primary/10 text-primary',
+                value === option.value && 'font-medium',
+                option.disabled && 'opacity-50 cursor-not-allowed',
+                option.danger && 'text-error'
+              )}
+              aria-selected={value === option.value}
+            >
+              <span className={cn('w-4 h-4 flex-shrink-0', value === option.value ? 'text-primary' : 'text-textMuted')}>
+                {option.icon ||
+                  (option.danger ? (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="15" y1="9" x2="9" y2="15" />
+                      <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  ))}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="block truncate font-medium">{option.label}</span>
+                {option.description && (
+                  <span className="block text-xs truncate text-textMuted">{option.description}</span>
+                )}
+              </div>
+              {value === option.value && <Check className="w-4 h-4 flex-shrink-0 text-primary" />}
+            </motion.button>
           ))}
-          {allItems.length === 0 && (
-            <div className="px-3 py-8 text-center text-textMuted">Nenhum comando encontrado</div>
-          )}
-        </div>
+        </motion.div>
       </div>
-    </div>,
-    document.body
+    </motion.div>
+  ) : null
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={toggle}
+        disabled={disabled}
+        className={cn(
+          'inline-flex items-center gap-2 h-9 px-3 rounded-lg border transition-colors duration-150',
+          'font-medium text-sm',
+          disabled
+            ? 'opacity-50 cursor-not-allowed bg-surface border-border text-textMuted'
+            : isOpen
+              ? 'bg-primary/10 border-primary text-primary'
+              : 'bg-surface border-border text-textSecondary hover:bg-surfaceHover hover:text-textPrimary hover:border-borderHover',
+          triggerClassName
+        )}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-disabled={disabled}
+        aria-label={ariaLabel}
+      >
+        {triggerIcon}
+        <span className="truncate max-w-[120px]">{triggerLabel || placeholder || 'Selecionar'}</span>
+        <motion.div
+          whileHover={{ rotate: isOpen ? 180 : 90 }}
+          whileTap={{ rotate: isOpen ? 180 : -90, scale: 0.9 }}
+          transition={transitions.snappy}
+          className="w-4 h-4 flex-shrink-0"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence>{createPortal(portalContent, document.body)}</AnimatePresence>
+    </div>
   )
 }
+
+export default Dropdown

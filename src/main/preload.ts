@@ -94,8 +94,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowClose: () => ipcRenderer.send('window-close'),
 
   // Provider (generic)
-  sendToProvider: (chatId: string, message: string, images?: string[]) =>
-    ipcRenderer.invoke('send-to-provider', chatId, message, images),
+  sendToProvider: (chatId: string, message: string, images?: string[]) => {
+    console.log('[Preload] sendToProvider CALLED - chatId:', chatId, 'message length:', message.length, 'images:', images?.length || 0)
+    return ipcRenderer.invoke('send-to-provider', chatId, message, images)
+  },
   startProvider: (projectPath: string, config?: { model?: string; effort?: string; webSearch?: boolean }) =>
     ipcRenderer.invoke('start-provider', projectPath, config),
   stopProvider: () => ipcRenderer.invoke('stop-provider'),
@@ -109,17 +111,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Provider Events (generic)
   onProviderOutput: (callback: (data: string) => void) => {
-    const listener = (_event: IpcRendererEvent, data: string) => callback(data)
+    const listener = (_event: IpcRendererEvent, data: string) => {
+      console.log('[Preload] onProviderOutput RECEIVED from main - data length:', data.length)
+      callback(data)
+    }
     ipcRenderer.on('provider-output', listener)
     return () => ipcRenderer.off('provider-output', listener)
   },
   onProviderError: (callback: (data: string) => void) => {
-    const listener = (_event: IpcRendererEvent, data: string) => callback(data)
+    const listener = (_event: IpcRendererEvent, data: string) => {
+      console.log('[Preload] onProviderError RECEIVED from main - error:', data)
+      callback(data)
+    }
     ipcRenderer.on('provider-error', listener)
     return () => ipcRenderer.off('provider-error', listener)
   },
   onProviderExit: (callback: (code: number) => void) => {
-    const listener = (_event: IpcRendererEvent, code: number) => callback(code)
+    const listener = (_event: IpcRendererEvent, code: number) => {
+      console.log('[Preload] onProviderExit RECEIVED from main - code:', code)
+      callback(code)
+    }
     ipcRenderer.on('provider-exit', listener)
     return () => ipcRenderer.off('provider-exit', listener)
   },

@@ -44,6 +44,8 @@ export interface Settings {
   effort: 'low' | 'medium' | 'high' | 'max' | 'xhigh'
   webSearch: boolean
   theme: 'pampas' | 'dark-premium' | 'tech-blue' | 'natural-green' | 'monochrome' | 'futuristic'
+  provider: string
+  hasCompletedOnboarding: boolean
 }
 
 interface InfinyState {
@@ -53,8 +55,8 @@ interface InfinyState {
   currentProject: Project | null
   currentChat: Chat | null
   settings: Settings
-  isClaudeRunning: boolean
-  claudeOutput: string
+  isProviderRunning: boolean
+  providerOutput: string
   isSidebarOpen: boolean
   isFilesPanelOpen: boolean
   pendingImages: string[]
@@ -62,26 +64,26 @@ interface InfinyState {
 
   // Actions
   addProject: (project: Omit<Project, 'id'>) => Project
-removeProject: (id: string) => void
-renameProject: (id: string, newName: string) => void
-setCurrentProject: (project: Project | null) => void
+  removeProject: (id: string) => void
+  renameProject: (id: string, newName: string) => void
+  setCurrentProject: (project: Project | null) => void
   addChat: (chat: Omit<Chat, 'id' | 'createdAt' | 'updatedAt'>) => Chat
-updateChat: (id: string, updates: Partial<Chat>) => void
-removeChat: (id: string) => void
-renameChat: (id: string, newTitle: string) => void
-setCurrentChat: (chat: Chat | null) => void
+  updateChat: (id: string, updates: Partial<Chat>) => void
+  removeChat: (id: string) => void
+  renameChat: (id: string, newTitle: string) => void
+  setCurrentChat: (chat: Chat | null) => void
   addMessage: (chatId: string, message: Omit<ChatMessage, 'id'>) => void
   updateMessage: (chatId: string, messageId: string, updates: Partial<ChatMessage>) => void
   updateSettings: (settings: Partial<Settings>) => void
-  setClaudeRunning: (running: boolean) => void
-  appendClaudeOutput: (output: string) => void
-  clearClaudeOutput: () => void
+  setProviderRunning: (running: boolean) => void
+  appendProviderOutput: (output: string) => void
+  clearProviderOutput: () => void
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   toggleFilesPanel: () => void
   setFilesPanelOpen: (open: boolean) => void
-  sendToClaude: (chatId: string, message: string, images?: string[]) => Promise<void>
-  stopClaude: () => void
+  sendToProvider: (chatId: string, message: string, images?: string[]) => Promise<void>
+  stopProvider: () => void
   addPendingImage: (base64: string) => void
   removePendingImage: (index: number) => void
   clearPendingImages: () => void
@@ -89,7 +91,12 @@ setCurrentChat: (chat: Chat | null) => void
   addGeneratedFile: (file: Omit<GeneratedFile, 'id'>) => void
   removeGeneratedFile: (id: string) => void
   getProjectFiles: (projectId: string) => GeneratedFile[]
-  openGeneratedFile: (id: string) => void
+  openGeneratedFile: (id: string) => Promise<void>
+  completeOnboarding: () => void
+
+  // Internal: Electron event handlers
+  _setupElectronListeners: () => void
+  _cleanupElectronListeners: () => void
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -97,16 +104,13 @@ const DEFAULT_SETTINGS: Settings = {
   effort: 'high',
   webSearch: false,
   theme: 'pampas',
+  provider: 'claude',
+  hasCompletedOnboarding: false,
 }
 
-const MODELS = [
-  'claude-fable-5',
-  'claude-opus-4-8',
-  'claude-sonnet-5',
-  'claude-haiku-4-5',
-] as const
-
-const EFFORTS = ['low', 'medium', 'high', 'max', 'xhigh'] as const
+let outputCleanup: (() => void) | null = null
+let errorCleanup: (() => void) | null = null
+let exitCleanup: (() => void) | null = null
 
 export const useStore = create<InfinyState>()(
   persist(
@@ -117,8 +121,8 @@ export const useStore = create<InfinyState>()(
       currentProject: null,
       currentChat: null,
       settings: DEFAULT_SETTINGS,
-      isClaudeRunning: false,
-      claudeOutput: '',
+      isProviderRunning: false,
+      providerOutput: '',
       isSidebarOpen: true,
       isFilesPanelOpen: false,
       pendingImages: [],
@@ -131,31 +135,31 @@ export const useStore = create<InfinyState>()(
       },
 
       removeProject: (id) => {
-  set((state) => ({
-    projects: state.projects.filter((p) => p.id !== id),
-    currentProject: state.currentProject?.id === id ? null : state.currentProject,
-    chats: state.chats.filter((c) => c.projectId !== id),
-  }))
-},
+        set((state) => ({
+          projects: state.projects.filter((p) => p.id !== id),
+          currentProject: state.currentProject?.id === id ? null : state.currentProject,
+          chats: state.chats.filter((c) => c.projectId !== id),
+        }))
+      },
 
-renameProject: (id, newName) => {
-  const trimmed = newName.trim()
-  if (!trimmed) return
+      renameProject: (id, newName) => {
+        const trimmed = newName.trim()
+        if (!trimmed) return
 
-  set((state) => ({
-    projects: state.projects.map((p) =>
-      p.id === id ? { ...p, name: trimmed } : p
-    ),
-    currentProject:
-      state.currentProject?.id === id
-        ? { ...state.currentProject, name: trimmed }
-        : state.currentProject,
-  }))
-},
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, name: trimmed } : p
+          ),
+          currentProject:
+            state.currentProject?.id === id
+              ? { ...state.currentProject, name: trimmed }
+              : state.currentProject,
+        }))
+      },
 
-setCurrentProject: (project) => {
-  set({ currentProject: project })
-},
+      setCurrentProject: (project) => {
+        set({ currentProject: project })
+      },
 
       addChat: (chat) => {
         const newChat: Chat = {
@@ -177,37 +181,33 @@ setCurrentProject: (project) => {
         }))
       },
 
-     removeChat: (id) => {
-  set((state) => ({
-    chats: state.chats.filter((c) => c.id !== id),
-    currentChat: state.currentChat?.id === id ? null : state.currentChat,
-  }))
-},
+      removeChat: (id) => {
+        set((state) => ({
+          chats: state.chats.filter((c) => c.id !== id),
+          currentChat: state.currentChat?.id === id ? null : state.currentChat,
+        }))
+      },
 
-renameChat: (id, newTitle) => {
-  const trimmed = newTitle.trim()
-  if (!trimmed) return
+      renameChat: (id, newTitle) => {
+        const trimmed = newTitle.trim()
+        if (!trimmed) return
 
-  set((state) => ({
-    chats: state.chats.map((c) =>
-      c.id === id
-        ? { ...c, title: trimmed, updatedAt: Date.now() }
-        : c
-    ),
-    currentChat:
-      state.currentChat?.id === id
-        ? {
-            ...state.currentChat,
-            title: trimmed,
-            updatedAt: Date.now(),
-          }
-        : state.currentChat,
-  }))
-},
+        set((state) => ({
+          chats: state.chats.map((c) =>
+            c.id === id ? { ...c, title: trimmed, updatedAt: Date.now() } : c
+          ),
+          currentChat:
+            state.currentChat?.id === id
+              ? { ...state.currentChat, title: trimmed, updatedAt: Date.now() }
+              : state.currentChat,
+        }))
+      },
 
-setCurrentChat: (chat) => {
-  set({ currentChat: chat })
-},
+      setCurrentChat: (chat) => {
+        set({ currentChat: chat })
+        // Configurar listeners do provider quando muda o chat
+        get()._setupElectronListeners()
+      },
 
       addMessage: (chatId, message) => {
         const newMessage: ChatMessage = { ...message, id: generateId() }
@@ -238,16 +238,16 @@ setCurrentChat: (chat) => {
         set((state) => ({ settings: { ...state.settings, ...settings } }))
       },
 
-      setClaudeRunning: (running) => {
-        set({ isClaudeRunning: running })
+      setProviderRunning: (running) => {
+        set({ isProviderRunning: running })
       },
 
-      appendClaudeOutput: (output) => {
-        set((state) => ({ claudeOutput: state.claudeOutput + output }))
+      appendProviderOutput: (output) => {
+        set((state) => ({ providerOutput: state.providerOutput + output }))
       },
 
-      clearClaudeOutput: () => {
-        set({ claudeOutput: '' })
+      clearProviderOutput: () => {
+        set({ providerOutput: '' })
       },
 
       toggleSidebar: () => {
@@ -260,6 +260,89 @@ setCurrentChat: (chat) => {
 
       toggleFilesPanel: () => {
         set((state) => ({ isFilesPanelOpen: !state.isFilesPanelOpen }))
+      },
+
+      setFilesPanelOpen: (open) => {
+        set({ isFilesPanelOpen: open })
+      },
+
+      sendToProvider: async (chatId: string, message: string, images: string[] = []) => {
+        const state = get()
+        const { currentProject, settings } = state
+
+        if (!currentProject) {
+          console.error('[Renderer] Nenhum projeto selecionado')
+          return
+        }
+
+        let assistantMessageId = ''
+
+        // Iniciar provider se não estiver rodando
+        if (!state.isProviderRunning) {
+          try {
+            console.log('[Renderer] sendToProvider - Starting provider for project:', currentProject.path)
+            await window.electronAPI?.startProvider(currentProject.path, {
+              model: settings.model,
+              effort: settings.effort,
+              webSearch: settings.webSearch,
+            })
+            // Aguardar um pouco para o provider iniciar
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          } catch (error) {
+            console.error('[Renderer] sendToProvider - Erro ao iniciar provider:', error)
+            return
+          }
+        }
+
+        // Enviar mensagem
+        try {
+          console.log('[Renderer] sendToProvider - Sending message, length:', message.length, 'images:', images.length)
+          set({ isProviderRunning: true, providerOutput: '' })
+
+          const assistantMessage: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            isStreaming: true,
+          }
+          assistantMessageId = assistantMessage.id
+
+          set((state) => ({
+            chats: state.chats.map((c) =>
+              c.id === chatId ? { ...c, messages: [...c.messages, assistantMessage], updatedAt: Date.now() } : c
+            ),
+            currentChat: state.currentChat?.id === chatId
+              ? { ...state.currentChat, messages: [...state.currentChat.messages, assistantMessage], updatedAt: Date.now() }
+              : state.currentChat,
+          }))
+
+          // Enviar para o provider via IPC
+          await window.electronAPI?.sendToProvider(chatId, message, images)
+          console.log('[Renderer] sendToProvider - IPC call completed')
+        } catch (error) {
+          console.error('[Renderer] sendToProvider - Erro ao enviar mensagem:', error)
+          set({ isProviderRunning: false })
+
+          // Remover mensagem de streaming em caso de erro
+          if (assistantMessageId) {
+            set((state) => ({
+              chats: state.chats.map((c) =>
+                c.id === chatId
+                  ? { ...c, messages: c.messages.filter((m) => m.id !== assistantMessageId), updatedAt: Date.now() }
+                  : c
+              ),
+              currentChat: state.currentChat?.id === chatId
+                ? { ...state.currentChat, messages: state.currentChat.messages.filter((m) => m.id !== assistantMessageId), updatedAt: Date.now() }
+                : state.currentChat,
+            }))
+          }
+        }
+      },
+
+      stopProvider: () => {
+        window.electronAPI?.stopProvider()
+        set({ isProviderRunning: false })
       },
 
       addPendingImage: (base64) => {
@@ -284,38 +367,81 @@ setCurrentChat: (chat) => {
       },
 
       removeGeneratedFile: (id) => {
-        set((state) => ({ generatedFiles: state.generatedFiles.filter(f => f.id !== id) }))
+        set((state) => ({ generatedFiles: state.generatedFiles.filter((f) => f.id !== id) }))
       },
 
       getProjectFiles: (projectId) => {
-        return get().generatedFiles.filter(f => f.projectId === projectId)
-      },
-
-      setFilesPanelOpen: (open) => {
-        set({ isFilesPanelOpen: open })
-      },
-
-      sendToClaude: async (chatId: string, message: string, images: string[] = []) => {
-        // Será implementado via IPC no main process
-        console.log('sendToClaude chamado', { chatId, message, images })
-      },
-
-      stopClaude: () => {
-        set({ isClaudeRunning: false })
+        return get().generatedFiles.filter((f) => f.projectId === projectId)
       },
 
       openGeneratedFile: async (id: string) => {
-        const file = get().generatedFiles.find(f => f.id === id)
+        const file = get().generatedFiles.find((f) => f.id === id)
         if (file) {
           await window.electronAPI?.openFile(file.path)
         }
+      },
+
+      completeOnboarding: () => {
+        set((state) => ({ settings: { ...state.settings, hasCompletedOnboarding: true } }))
+      },
+
+      _setupElectronListeners: () => {
+        // Limpar listeners anteriores
+        get()._cleanupElectronListeners()
+
+        // Listener para saída do provider (streaming)
+        outputCleanup = window.electronAPI?.onProviderOutput((data: string) => {
+          console.log('[Renderer] onProviderOutput - Received data, length:', data.length)
+          get().appendProviderOutput(data)
+
+          // Atualizar a mensagem de streaming
+          const currentChat = get().currentChat
+          if (currentChat) {
+            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              get().updateMessage(currentChat.id, lastMessage.id, {
+                content: lastMessage.content + data,
+              })
+            }
+          }
+        })
+
+        errorCleanup = window.electronAPI?.onProviderError((data: string) => {
+          console.error('[Renderer] onProviderError:', data)
+          get().appendProviderOutput(`\n[Erro: ${data}]`)
+        })
+
+        exitCleanup = window.electronAPI?.onProviderExit((code: number) => {
+          console.log('[Renderer] onProviderExit - code:', code)
+          set({ isProviderRunning: false })
+
+          // Finalizar mensagem de streaming
+          const currentChat = get().currentChat
+          if (currentChat) {
+            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              get().updateMessage(currentChat.id, lastMessage.id, {
+                isStreaming: false,
+              })
+            }
+          }
+        })
+      },
+
+      _cleanupElectronListeners: () => {
+        if (outputCleanup) outputCleanup()
+        if (errorCleanup) errorCleanup()
+        if (exitCleanup) exitCleanup()
+        outputCleanup = null
+        errorCleanup = null
+        exitCleanup = null
       },
     }),
     {
       name: 'infiny-storage',
       partialize: (state) => ({
         projects: state.projects,
-        chats: state.chats.map(c => ({ ...c, messages: c.messages.slice(-50) })),
+        chats: state.chats.map((c) => ({ ...c, messages: c.messages.slice(-50) })),
         settings: state.settings,
         isSidebarOpen: state.isSidebarOpen,
       }),
@@ -327,4 +453,15 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
-export { MODELS, EFFORTS }
+// Exportar constantes para uso em componentes
+export const MODELS = [
+  'claude-fable-5',
+  'claude-opus-4-8',
+  'claude-sonnet-5',
+  'claude-haiku-4-5-20251001',
+  'claude-haiku-4-5',
+] as const
+
+export const EFFORTS = ['low', 'medium', 'high', 'max', 'xhigh'] as const
+
+export const PROVIDERS = ['claude', 'free-claude', 'gemini', 'codex', 'ollama', 'openrouter', 'nim'] as const
