@@ -1,0 +1,6 @@
+export { ProcessManager } from './ProcessManager'
+export type { ProcessInfo, HealthCheckConfig, ProcessManagerEvents } from './ProcessManager'
+export { FCCServerManager } from '../../providers/freeClaude/fccServerManager'
+export type { FreeClaudeConfig, FreeClaudeProviderId } from '../../providers/freeClaude/FreeClaudeConfig'
+export type { ModelOption } from '../../providers/freeClaude/modelMapping'
+export { getSupportedModelsForProvider, getModelLabel, getModelDescription, resolveModelId } from '../../providers/freeClaude/modelMapping'

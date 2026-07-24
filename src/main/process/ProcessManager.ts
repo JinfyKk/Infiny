@@ -24,36 +24,57 @@ export interface ProcessManagerEvents {
   'process-error': [info: ProcessInfo, error: Error]
   'process-output': [processName: string, output: string]
   'process-restarting': [processName: string, attempt: number]
-  'status-changed': [processName: string, status: ProcessInfo['status'], details?: string]
+  'status-changed': [
+    processName: string,
+    status: ProcessInfo['status'],
+    details?: string
+  ]
+}
+
+interface RestartPolicy {
+  maxRetries: number
+  delayMs: number
+  attempts: number
+}
+
+interface SpawnParams {
+  command: string
+  args: string[]
+  options: SpawnOptions
+  healthCheck?: HealthCheckConfig
 }
 
 /**
- * ProcessManager - Gerenciador genérico de processos filhos.
+ * Gerenciador genérico de processos.
  *
- * Responsabilidades:
- * - Spawn/stop/restart de processos nomeados
- * - Tracking de estado por nome de processo
- * - Encaminhamento de stdout/stderr/events
- * - Health checks opcionais por processo
- * - Auto-restart com backoff exponencial (configurável por processo)
+ * NÃO conhece providers.
+ * NÃO conhece Claude.
+ * NÃO conhece fcc-server.
  *
- * NÃO conhece: fcc-server, claude, providers, proxies, models.
- * Apenas gerencia processos filhos genéricos.
+ * Apenas gerencia processos filhos.
  */
 export class ProcessManager extends EventEmitter {
-  private processes: Map<string, ProcessInfo> = new Map()
-  private healthChecks: Map<string, { timer: NodeJS.Timeout; config: HealthCheckConfig }> = new Map()
-  private restartConfigs: Map<string, { maxAttempts: number; backoffMs: number; attempts: number }> = new Map()
-  private isShuttingDown = false
+  private processes = new Map<string, ProcessInfo>()
 
-  // ============================================
-  // PUBLIC API
-  // ============================================
+  private healthChecks = new Map<
+    string,
+    {
+      timer: NodeJS.Timeout
+      config: HealthCheckConfig
+    }
+  >()
 
-  /**
-   * Inicia um novo processo nomeado.
-   * Se já existir processo com mesmo nome, para o anterior primeiro.
-   */
+  // Guarda os últimos parâmetros usados no spawn() de cada processo,
+  // para permitir restart() sem que o chamador precise repassar tudo de novo.
+  private spawnParams = new Map<string, SpawnParams>()
+
+  // Política de auto-restart configurada via configureRestart().
+  private restartPolicies = new Map<string, RestartPolicy>()
+
+  // Nomes de processos que foram parados intencionalmente via stop(),
+  // para não disparar auto-restart nesses casos.
+  private intentionalStops = new Set<string>()
+
   async spawn(
     name: string,
     command: string,
@@ -61,12 +82,23 @@ export class ProcessManager extends EventEmitter {
     options: SpawnOptions = {},
     healthCheck?: HealthCheckConfig
   ): Promise<ChildProcess> {
-    console.log('[DEBUG] [ProcessManager] spawn() - START, name:', name, 'command:', command)
-    // Parar processo existente com mesmo nome
+
+    console.log(
+      '[ProcessManager] spawn:',
+      name,
+      command,
+      args.join(' ')
+    )
+
+
     if (this.processes.has(name)) {
-      console.log('[DEBUG] [ProcessManager] spawn() - stopping existing process:', name)
       await this.stop(name)
     }
+
+    // Guarda os parâmetros para permitir restart() futuramente.
+    this.spawnParams.set(name, { command, args, options, healthCheck })
+    this.intentionalStops.delete(name)
+
 
     const info: ProcessInfo = {
       name,
@@ -75,326 +107,514 @@ export class ProcessManager extends EventEmitter {
       args,
       options,
       startedAt: Date.now(),
-      status: 'starting',
+      status: 'starting'
     }
 
+
     this.processes.set(name, info)
-    this.emit('status-changed', name, 'starting', `Iniciando ${command} ${args.join(' ')}`)
+
+
+    this.emit(
+      'status-changed',
+      name,
+      'starting',
+      `Iniciando ${command}`
+    )
+
 
     return new Promise((resolve, reject) => {
-      try {
-        console.log('[DEBUG] [ProcessManager] spawn() - calling child_process.spawn')
-        const child = spawn(command, args, {
-          ...options,
-          windowsHide: options.windowsHide ?? true,
-        })
 
-        console.log('[DEBUG] [ProcessManager] spawn() - spawn returned, pid:', child.pid)
+      let spawned = false
 
-        info.process = child
+
+      const child = spawn(command, args, {
+        ...options,
+        windowsHide: options.windowsHide ?? true
+      })
+
+
+      info.process = child
+
+
+      /*
+       * IMPORTANTE:
+       * spawn() retornar não significa que iniciou.
+       *
+       * O evento "spawn" confirma que o processo realmente nasceu.
+       */
+      child.once('spawn', () => {
+
+        spawned = true
+
         info.status = 'running'
-        this.emit('status-changed', name, 'running', 'Processo iniciado')
-        this.emit('process-started', info)
 
-        // Setup stdout/stderr forwarding
-        child.stdout?.on('data', (data: Buffer) => {
-          const output = data.toString()
-          console.log('[ProcessManager] stdout raw - process:', name, 'length:', output.length, 'preview:', output.substring(0, 100))
-          this.emit('process-output', name, output)
-        })
 
-        child.stderr?.on('data', (data: Buffer) => {
-          const error = data.toString()
-          console.log('[ProcessManager] stderr raw - process:', name, 'length:', error.length, 'preview:', error.substring(0, 100))
-          this.emit('process-output', name, error) // stderr também vai para output
-        })
+        this.emit(
+          'status-changed',
+          name,
+          'running',
+          'Processo iniciado'
+        )
 
-        child.on('error', (err: NodeJS.ErrnoException) => {
-          console.log('[DEBUG] [ProcessManager] spawn() - child.on(error):', err.message, 'code:', err.code)
+
+        this.emit(
+          'process-started',
+          info
+        )
+
+
+        resolve(child)
+      })
+
+
+      child.stdout?.on(
+        'data',
+        (data: Buffer) => {
+          this.emit(
+            'process-output',
+            name,
+            data.toString()
+          )
+        }
+      )
+
+
+      child.stderr?.on(
+        'data',
+        (data: Buffer) => {
+          this.emit(
+            'process-output',
+            name,
+            data.toString()
+          )
+        }
+      )
+
+
+      child.on(
+        'error',
+        (err: NodeJS.ErrnoException) => {
+
+          console.error(
+            '[ProcessManager] spawn error:',
+            err.code,
+            err.message
+          )
+
+
           info.status = 'error'
           info.error = err.message
-          this.emit('process-error', info, err)
-          this.emit('status-changed', name, 'error', err.message)
 
-          // Erros de spawn fatais significam que o processo NUNCA chegou a
-          // nascer (ex: ENOENT = comando não existe, EACCES = sem permissão,
-          // ENOEXEC = arquivo não-executável). Reiniciar nesses casos é inútil:
-          // é sempre o mesmo comando inválido, então vai falhar exatamente
-          // igual em toda tentativa. Isso é erro de configuração, não crash
-          // transitório — não deve entrar no ciclo de auto-restart.
-          const fatalSpawnErrors = ['ENOENT', 'EACCES', 'ENOEXEC']
-          if (err.code && fatalSpawnErrors.includes(err.code)) {
-            console.error(
-              `[ProcessManager] Erro fatal de spawn para "${name}" (${err.code}): ` +
-              `o comando "${info.command}" não pôde ser executado. Auto-restart ` +
-              `desabilitado para este erro — corrija o comando/caminho do executável.`
+
+          this.emit(
+            'process-error',
+            info,
+            err
+          )
+
+
+          this.emit(
+            'status-changed',
+            name,
+            'error',
+            err.message
+          )
+
+
+          const fatalErrors = [
+            'ENOENT',
+            'EACCES',
+            'ENOEXEC'
+          ]
+
+
+          if (
+            err.code &&
+            fatalErrors.includes(err.code)
+          ) {
+
+            this.handleFatalSpawnError(
+              name,
+              err.message
             )
-            this.handleFatalSpawnError(name)
+
           } else {
-            this.handleProcessExit(name, -1)
+
+            this.handleProcessExit(
+              name,
+              -1
+            )
+
           }
 
-          reject(err)
-        })
 
-        child.on('close', (code: number | null) => {
-          console.log('[DEBUG] [ProcessManager] spawn() - child.on(close):', code)
-          this.handleProcessExit(name, code)
-        })
-
-        // Health check opcional
-        if (healthCheck) {
-          console.log('[DEBUG] [ProcessManager] spawn() - setting up health check for:', name)
-          this.setupHealthCheck(name, healthCheck)
+          /*
+           * Se spawn falhou antes do processo existir,
+           * rejeita a Promise.
+           */
+          if (!spawned) {
+            reject(err)
+          }
         }
+      )
 
-        console.log('[DEBUG] [ProcessManager] spawn() - resolving promise')
-        resolve(child)
-      } catch (err) {
-        console.log('[DEBUG] [ProcessManager] spawn() - catch block:', err)
-        info.status = 'error'
-        info.error = err instanceof Error ? err.message : String(err)
-        this.emit('status-changed', name, 'error', info.error)
-        this.processes.delete(name)
-        reject(err)
+
+      child.on(
+        'close',
+        (code) => {
+
+          console.log(
+            '[ProcessManager] closed:',
+            name,
+            code
+          )
+
+
+          this.handleProcessExit(
+            name,
+            code
+          )
+        }
+      )
+
+
+      if (healthCheck) {
+        this.setupHealthCheck(
+          name,
+          healthCheck
+        )
       }
+
     })
   }
 
-  /**
-   * Para um processo pelo nome.
-   */
-  async stop(name: string, signal: NodeJS.Signals = 'SIGINT', forceTimeoutMs = 3000): Promise<void> {
+
+  async stop(
+    name: string,
+    signal: NodeJS.Signals = 'SIGINT',
+    forceTimeoutMs = 3000
+  ): Promise<void> {
+
     const info = this.processes.get(name)
+
     if (!info || !info.process) {
       return
     }
 
-    this.emit('status-changed', name, 'stopped', 'Parando processo')
+    // Marca como parada intencional para não disparar auto-restart.
+    this.intentionalStops.add(name)
 
-    // Cleanup health check
     this.clearHealthCheck(name)
 
-    const child = info.process
-    info.status = 'stopped'
 
-    return new Promise((resolve) => {
-      const forceKill = setTimeout(() => {
+    const child = info.process
+
+
+    return new Promise(resolve => {
+
+      const timer = setTimeout(() => {
+
         if (!child.killed) {
           child.kill('SIGKILL')
         }
+
       }, forceTimeoutMs)
 
-      child.once('close', (code: number | null) => {
-        clearTimeout(forceKill)
-        this.handleProcessExit(name, code)
-        resolve()
-      })
 
-      child.kill(signal)
+      child.once(
+        'close',
+        code => {
+
+          clearTimeout(timer)
+
+          this.handleProcessExit(
+            name,
+            code
+          )
+
+          resolve()
+        }
+      )
+
+
+       child.kill(signal)
+
     })
   }
 
   /**
-   * Reinicia um processo usando a mesma configuração original.
-   */
-  async restart(name: string): Promise<ChildProcess | null> {
-    const info = this.processes.get(name)
-    if (!info) {
-      console.warn(`[ProcessManager] Processo "${name}" não encontrado para restart`)
-      return null
-    }
-
-    const restartConfig = this.restartConfigs.get(name)
-    const attempt = (restartConfig?.attempts ?? 0) + 1
-    const maxAttempts = restartConfig?.maxAttempts ?? 3
-    const backoffMs = restartConfig?.backoffMs ?? 2000
-
-    if (attempt > maxAttempts) {
-      this.emit('status-changed', name, 'error', `Máximo de tentativas de restart atingido (${maxAttempts})`)
-      return null
-    }
-
-    this.emit('process-restarting', name, attempt)
-    this.emit('status-changed', name, 'starting', `Reiniciando (tentativa ${attempt}/${maxAttempts})`)
-
-    if (restartConfig) {
-      restartConfig.attempts = attempt
-    }
-
-    const delay = backoffMs * Math.pow(2, attempt - 1)
-    await new Promise((r) => setTimeout(r, delay))
-
-    try {
-      const child = await this.spawn(name, info.command, info.args, info.options)
-      if (restartConfig) {
-        restartConfig.attempts = 0 // Reset on success
-      }
-      return child
-    } catch (error) {
-      console.error(`[ProcessManager] Restart falhou para "${name}":`, error)
-      return this.restart(name) // Tentar novamente (recursivo com backoff)
-    }
-  }
-
-  /**
-   * Configura auto-restart para um processo.
-   */
-  configureRestart(name: string, maxAttempts: number, backoffMs: number): void {
-    this.restartConfigs.set(name, { maxAttempts, backoffMs, attempts: 0 })
-  }
-
-  /**
-   * Obtém informações de um processo.
-   */
-  get(name: string): ProcessInfo | undefined {
-    return this.processes.get(name)
-  }
-
-  /**
-   * Verifica se um processo está rodando.
+   * Verifica se um processo está rodando no momento.
    */
   isRunning(name: string): boolean {
     const info = this.processes.get(name)
-    return info?.status === 'running' && info.process !== null && !info.process.killed
+    return !!info && info.status === 'running'
   }
 
   /**
-   * Lista todos os processos gerenciados.
-   */
-  list(): ProcessInfo[] {
-    return Array.from(this.processes.values())
-  }
-
-  /**
-   * Obtém o processo filho bruto (para stdin.write, etc).
-   */
-  getProcess(name: string): ChildProcess | null {
-    return this.processes.get(name)?.process ?? null
-  }
-
-  /**
-   * Escreve no stdin de um processo.
+   * Escreve dados no stdin de um processo (ex.: enviar mensagem NDJSON pro Claude CLI).
+   * Retorna false se o processo não existir, não estiver rodando, ou o stdin não for gravável.
    */
   writeToProcess(name: string, data: string): boolean {
-    const child = this.getProcess(name)
-    if (!child || !child.stdin?.writable) {
-      console.warn('[ProcessManager] writeToProcess - FAILED:', {
-        processName: name,
-        childExists: !!child,
-        stdinExists: !!child?.stdin,
-        stdinWritable: !!child?.stdin?.writable,
-      })
+    const info = this.processes.get(name)
+
+    if (!info || !info.process || info.status !== 'running') {
       return false
     }
+
+    const stdin = info.process.stdin
+
+    if (!stdin || !stdin.writable) {
+      return false
+    }
+
     try {
-      const bytesWritten = child.stdin.write(data)
-      console.log('[ProcessManager] writeToProcess - SUCCESS:', {
-        processName: name,
-        bytesWritten,
-      })
-      return true
+      return stdin.write(data)
     } catch (error) {
-      console.warn('[ProcessManager] writeToProcess - EXCEPTION:', {
-        processName: name,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      console.error(
+        `[ProcessManager] writeToProcess falhou: ${name}`,
+        error
+      )
       return false
     }
   }
 
   /**
-   * Para todos os processos e limpa recursos.
+   * Reinicia um processo usando os mesmos parâmetros do último spawn().
+   * Usado tanto manualmente (ex.: health check onFailure) quanto pela
+   * política de auto-restart configurada via configureRestart().
+   */
+  async restart(name: string): Promise<void> {
+    const params = this.spawnParams.get(name)
+
+    if (!params) {
+      throw new Error(
+        `[ProcessManager] restart() falhou: nenhum spawn anterior encontrado para "${name}"`
+      )
+    }
+
+    if (this.isRunning(name)) {
+      await this.stop(name)
+    }
+
+    await this.spawn(
+      name,
+      params.command,
+      params.args,
+      params.options,
+      params.healthCheck
+    )
+  }
+
+  /**
+   * Configura a política de auto-restart para um processo: quantas vezes
+   * tentar reiniciar automaticamente após uma queda inesperada, e o
+   * intervalo base entre tentativas (com backoff linear por tentativa).
+   */
+  configureRestart(name: string, maxRetries: number, delayMs: number): void {
+    this.restartPolicies.set(name, {
+      maxRetries,
+      delayMs,
+      attempts: 0
+    })
+  }
+
+
+  private handleProcessExit(
+    name: string,
+    code: number | null
+  ) {
+    const info = this.processes.get(name)
+
+    if (!info) {
+      return
+    }
+
+
+    info.status = code === 0
+      ? 'stopped'
+      : 'error'
+
+
+    this.emit(
+      'process-stopped',
+      info,
+      code
+    )
+
+
+    this.emit(
+      'status-changed',
+      name,
+      info.status,
+      `Processo encerrado (${code})`
+    )
+
+
+    this.clearHealthCheck(name)
+
+    this.maybeAutoRestart(name, code)
+  }
+
+  /**
+   * Se houver uma política de restart configurada para o processo e a
+   * queda não foi de um stop() intencional, agenda uma tentativa de
+   * restart automático (com backoff linear), respeitando maxRetries.
+   */
+  private maybeAutoRestart(name: string, code: number | null) {
+    const wasIntentional = this.intentionalStops.has(name)
+    this.intentionalStops.delete(name)
+
+    if (wasIntentional || code === 0) {
+      // Parada intencional ou saída limpa: não reinicia automaticamente.
+      const policy = this.restartPolicies.get(name)
+      if (policy) {
+        policy.attempts = 0
+      }
+      return
+    }
+
+    const policy = this.restartPolicies.get(name)
+
+    if (!policy) {
+      return
+    }
+
+    if (policy.attempts >= policy.maxRetries) {
+      console.warn(
+        `[ProcessManager] "${name}" excedeu o número máximo de restarts (${policy.maxRetries})`
+      )
+      return
+    }
+
+    policy.attempts += 1
+    const attempt = policy.attempts
+    const delay = policy.delayMs * attempt
+
+    this.emit('process-restarting', name, attempt)
+
+    setTimeout(() => {
+      this.restart(name).catch((error) => {
+        console.error(
+          `[ProcessManager] auto-restart falhou para "${name}":`,
+          error
+        )
+      })
+    }, delay)
+  }
+
+
+  private setupHealthCheck(
+    name: string,
+    config: HealthCheckConfig
+  ) {
+    this.clearHealthCheck(name)
+
+
+    const timer = setInterval(
+      async () => {
+        try {
+          const healthy = await config.check()
+
+          if (!healthy) {
+            console.warn(
+              `[ProcessManager] Health check falhou: ${name}`
+            )
+
+            config.onFailure?.(name)
+          }
+
+        } catch (error) {
+          console.error(
+            `[ProcessManager] Health check erro: ${name}`,
+            error
+          )
+        }
+      },
+      config.intervalMs
+    )
+
+
+    this.healthChecks.set(
+      name,
+      {
+        timer,
+        config
+      }
+    )
+  }
+
+
+  private clearHealthCheck(
+    name: string
+  ) {
+    const health = this.healthChecks.get(name)
+
+    if (!health) {
+      return
+    }
+
+
+    clearInterval(
+      health.timer
+    )
+
+    this.healthChecks.delete(name)
+  }
+
+
+  private handleFatalSpawnError(
+    name: string,
+    message: string
+  ) {
+    const info = this.processes.get(name)
+
+    if (!info) {
+      return
+    }
+
+
+    info.status = 'error'
+    info.error = message
+
+
+    this.emit(
+      'process-error',
+      info,
+      new Error(message)
+    )
+
+
+    this.emit(
+      'status-changed',
+      name,
+      'error',
+      message
+    )
+  }
+
+  /**
+   * Para todos os processos gerenciados graciosamente.
+   * Limpa health checks e aguarda encerramento.
+   * Seguro para chamar múltiplas vezes.
    */
   async shutdown(): Promise<void> {
-    this.isShuttingDown = true
+    console.log('[ProcessManager] Shutting down all processes...')
 
     // Parar todos os health checks
-    for (const name of this.healthChecks.keys()) {
-      this.clearHealthCheck(name)
+    for (const [, health] of this.healthChecks) {
+      clearInterval(health.timer)
     }
+    this.healthChecks.clear()
 
     // Parar todos os processos
-    const names = Array.from(this.processes.keys())
-    await Promise.all(names.map((name) => this.stop(name)))
+    const stopPromises = Array.from(this.processes.keys()).map(name => this.stop(name))
+    await Promise.all(stopPromises)
 
     this.processes.clear()
-    this.restartConfigs.clear()
-    console.log('[ProcessManager] Shutdown completo')
+    this.spawnParams.clear()
+    this.restartPolicies.clear()
+    this.intentionalStops.clear()
+
+    console.log('[ProcessManager] Shutdown complete')
   }
-
-  // ============================================
-  // INTERNAL
-  // ============================================
-
-  /**
-   * Lida com erro fatal de spawn (ENOENT, EACCES, ENOEXEC): o processo nunca
-   * chegou a existir, então não há "exit code" nem "processo rodando" a
-   * encerrar. Diferente de handleProcessExit(), aqui NUNCA agendamos restart
-   * — removemos o processo e a config de restart definitivamente, e deixamos
-   * o status como 'error' para quem estiver ouvindo 'status-changed' saber
-   * que precisa de intervenção manual (corrigir comando/caminho), não de
-   * mais tentativas automáticas.
-   */
-  private handleFatalSpawnError(name: string): void {
-    this.processes.delete(name)
-    this.restartConfigs.delete(name)
-    this.clearHealthCheck(name)
-  }
-
-  private handleProcessExit(name: string, code: number | null): void {
-    const info = this.processes.get(name)
-    if (!info) return
-
-    info.status = 'stopped'
-    this.emit('process-stopped', info, code)
-    this.emit('status-changed', name, 'stopped', `Exit code: ${code ?? 'signal'}`)
-
-    // Auto-restart se configurado e não foi shutdown intencional
-    const restartConfig = this.restartConfigs.get(name)
-    if (restartConfig && !this.isShuttingDown && code !== 0) {
-      console.log(`[ProcessManager] Processo "${name}" saiu com código ${code}, agendando restart...`)
-      this.restart(name)
-    } else {
-      this.processes.delete(name)
-      this.restartConfigs.delete(name)
-    }
-  }
-
-  private setupHealthCheck(name: string, config: HealthCheckConfig): void {
-    this.clearHealthCheck(name)
-
-    const timer = setInterval(async () => {
-      try {
-        const healthy = await config.check()
-        if (!healthy) {
-          console.warn(`[ProcessManager] Health check falhou para "${name}"`)
-          config.onFailure?.(name)
-        }
-      } catch (error) {
-        console.warn(`[ProcessManager] Health check erro para "${name}":`, error)
-        config.onFailure?.(name)
-      }
-    }, config.intervalMs)
-
-    this.healthChecks.set(name, { timer, config })
-  }
-
-  private clearHealthCheck(name: string): void {
-    const hc = this.healthChecks.get(name)
-    if (hc) {
-      clearInterval(hc.timer)
-      this.healthChecks.delete(name)
-    }
-  }
-}
-
-// Tipo para eventos tipados
-export type ProcessManagerEventMap = {
-  'process-started': [info: ProcessInfo]
-  'process-stopped': [info: ProcessInfo, code: number | null]
-  'process-error': [info: ProcessInfo, error: Error]
-  'process-output': [processName: string, output: string]
-  'process-restarting': [processName: string, attempt: number]
-  'status-changed': [processName: string, status: ProcessInfo['status'], details?: string]
 }

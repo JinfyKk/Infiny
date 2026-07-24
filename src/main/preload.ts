@@ -1,177 +1,161 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 /**
- * Interface da API exposta ao renderer (preload).
- * Todas as chamadas de Provider são genéricas - não expõem detalhes de implementação.
- * Os eventos do ProcessManager devem espelhar EXATAMENTE o formato enviado pelo main.ts
- * (main.ts é a fonte da verdade).
+ * Tipos dos eventos do ProcessManager encaminhados ao renderer
  */
-interface ElectronAPI {
-  // Projects
-  getProjects: () => Promise<Array<{ id: string; name: string; path: string; lastOpened: number }>>
-  addProject: (name: string, path: string) => Promise<Array<{ id: string; name: string; path: string; lastOpened: number }>>
-  removeProject: (id: string) => Promise<Array<{ id: string; name: string; path: string; lastOpened: number }>>
-  selectFolder: () => Promise<string | null>
-
-  // Chats (legacy - kept for compatibility)
-  getChats: (projectPath?: string) => Promise<any[]>
-  saveChat: (chat: any) => Promise<any>
-  deleteChat: (chatId: string) => Promise<any[]>
-
-  // Settings / Provider Config
-  getSettings: () => Promise<{ model: string; effort: string; webSearch: boolean }>
-  updateSettings: (settings: any) => Promise<{ model: string; effort: string; webSearch: boolean }>
-
-  // Files
-  readFile: (path: string) => Promise<{ success: boolean; content?: string; size?: number; name?: string; error?: string }>
-  writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
-  listFiles: (dirPath: string) => Promise<Array<{ name: string; path: string; isDirectory: boolean; size: number; modified: number }>>
-  openFile: (path: string) => Promise<void>
-  showItemInFolder: (path: string) => Promise<void>
-
-  // Window controls
-  windowMinimize: () => void
-  windowMaximize: () => void
-  windowClose: () => void
-
-  // Provider (generic - replaces claude-specific)
-  sendToProvider: (chatId: string, message: string, images?: string[]) => Promise<{ success: boolean; error?: string }>
-  startProvider: (projectPath: string, config?: { model?: string; effort?: string; webSearch?: boolean }) => Promise<{ success: boolean; error?: string }>
-  stopProvider: () => Promise<{ success: boolean; error?: string }>
-  restartProvider: () => Promise<{ success: boolean; error?: string }>
-  getProviderConfig: () => Promise<{ providerId: string; config: any }>
-  saveProviderConfig: (config: any) => Promise<void>
-  getAvailableProviders: () => Promise<Array<{ id: string; name: string }>>
-  setActiveProvider: (providerId: string, config?: any) => Promise<{ success: boolean; error?: string }>
-  getAvailableModels: () => Promise<Array<{ value: string; label: string; description: string }>>
-
-  // Provider Events (generic - replaces claude-output, claude-error, claude-exit)
-  onProviderOutput: (callback: (data: string) => void) => () => void
-  onProviderError: (callback: (data: string) => void) => () => void
-  onProviderExit: (callback: (code: number) => void) => () => void
-
-  // Process Manager Events - espelham EXATAMENTE o formato do main.ts
-  // main.ts envia: { name, command, args }
-  onProcessStarted: (callback: (data: { name: string; command: string; args: string[] }) => void) => () => void
-  // main.ts envia: { name, code }
-  onProcessStopped: (callback: (data: { name: string; code: number | null }) => void) => () => void
-  // main.ts envia: { name, error }
-  onProcessError: (callback: (data: { name: string; error: string }) => void) => () => void
-  // main.ts envia: { processName, output }
-  onProcessOutput: (callback: (data: { processName: string; output: string }) => void) => () => void
-  // main.ts envia: { processName, attempt }
-  onProcessRestarting: (callback: (data: { processName: string; attempt: number }) => void) => () => void
-  // main.ts envia: { processName, status, details } (via status-changed)
-  onProcessStatus: (callback: (data: { processName: string; status: string; details?: string }) => void) => () => void
+export interface ProcessStatusEvent {
+  processName: string
+  status: 'starting' | 'running' | 'stopped' | 'error'
+  details?: string
 }
 
+export interface ProcessErrorEvent {
+  name: string
+  error: string
+}
+
+export interface ProcessStoppedEvent {
+  name: string
+  code: number | null
+}
+
+export interface ProcessRestartingEvent {
+  processName: string
+  attempt: number
+}
+
+export interface ProcessStartedEvent {
+  name: string
+  command: string
+  args: string[]
+}
+
+export interface ProcessOutputEvent {
+  processName: string
+  output: string
+}
+
+/**
+ * API exposta ao renderer via contextBridge
+ */
+export interface ElectronAPI {
+  // Project management
+  getProjects: () => Promise<any[]>
+  createProject: (name: string, path: string) => Promise<any>
+  selectFolder: () => Promise<string | undefined>
+  loadProject: (name: string) => Promise<any>
+  saveProject: (project: any) => Promise<void>
+  deleteProject: (name: string) => Promise<void>
+
+  // Provider management
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>) => Promise<{ success: boolean; error?: string }>
+  sendToProvider: (chatId: string, message: string, images?: string[]) => Promise<{ success: boolean }>
+  stopProvider: () => Promise<{ success: boolean }>
+  restartProvider: () => Promise<{ success: boolean; error?: string }>
+  getProviderConfig: () => Promise<{ providerId: string; config: ProviderConfig }>
+  saveProviderConfig: (config: Partial<ProviderConfig>) => Promise<void>
+  getAvailableProviders: () => Promise<Array<{ id: string; name: string }>>
+  getProviderModels: () => Promise<any[]>
+  // Alias for backward compatibility
+  getAvailableModels: () => Promise<any[]>
+  setActiveProvider: (providerId: string, config?: Partial<ProviderConfig>) => Promise<{ success: boolean; error?: string }>
+
+  // Files
+  openFile: (path: string) => Promise<void>
+  getFileInfo: (path: string) => Promise<{ name: string; size: number; modified: Date } | null>
+  readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>
+  writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
+  listFiles: (dirPath: string) => Promise<any[]>
+
+  // Process events (from ProcessManager)
+  onProcessStatus: (callback: (event: ProcessStatusEvent) => void) => () => void
+  onProcessError: (callback: (event: ProcessErrorEvent) => void) => () => void
+  onProcessStopped: (callback: (event: ProcessStoppedEvent) => void) => () => void
+  onProcessRestarting: (callback: (event: ProcessRestartingEvent) => void) => () => void
+  onProcessStarted: (callback: (event: ProcessStartedEvent) => void) => () => void
+  onProcessOutput: (callback: (event: ProcessOutputEvent) => void) => () => void
+
+  // Provider events (from ProviderManager)
+  onProviderOutput: (callback: (data: string) => void) => () => void
+  onProviderError: (callback: (error: string) => void) => () => void
+  onProviderExit: (callback: (code: number) => void) => () => void
+}
+
+/**
+ * Configuração do Provider (espelha ProviderConfig do main)
+ */
+export interface ProviderConfig {
+  model: string
+  effort: string
+  webSearch: boolean
+  projectPath: string
+  [key: string]: any
+}
+
+/**
+ * Helper para criar listeners IPC com cleanup automático
+ */
+function createIpcListener<T>(channel: string, callback: (event: T) => void): () => void {
+  const handler = (_event: Electron.IpcRendererEvent, data: T) => callback(data)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.off(channel, handler)
+}
+
+// Expor API ao renderer
 contextBridge.exposeInMainWorld('electronAPI', {
   // Projects
   getProjects: () => ipcRenderer.invoke('get-projects'),
-  addProject: (name: string, path: string) => ipcRenderer.invoke('add-project', name, path),
-  removeProject: (id: string) => ipcRenderer.invoke('remove-project', id),
+  createProject: (name: string, path: string) => ipcRenderer.invoke('create-project', name, path),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  loadProject: (name: string) => ipcRenderer.invoke('load-project', name),
+  saveProject: (project: any) => ipcRenderer.invoke('save-project', project),
+  deleteProject: (name: string) => ipcRenderer.invoke('delete-project', name),
 
-  // Chats (legacy)
-  getChats: (projectPath?: string) => ipcRenderer.invoke('get-chats', projectPath),
-  saveChat: (chat: any) => ipcRenderer.invoke('save-chat', chat),
-  deleteChat: (chatId: string) => ipcRenderer.invoke('delete-chat', chatId),
-
-  // Settings
-  getSettings: () => ipcRenderer.invoke('get-provider-config'),
-  updateSettings: (settings: any) => ipcRenderer.invoke('save-provider-config', settings),
-
-  // Files
-  readFile: (path: string) => ipcRenderer.invoke('read-file', path),
-  writeFile: (path: string, content: string) => ipcRenderer.invoke('write-file', path, content),
-  listFiles: (dirPath: string) => ipcRenderer.invoke('list-files', dirPath),
-  openFile: (path: string) => ipcRenderer.invoke('open-file', path),
-  showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
-
-  // Window controls
-  windowMinimize: () => ipcRenderer.send('window-minimize'),
-  windowMaximize: () => ipcRenderer.send('window-maximize'),
-  windowClose: () => ipcRenderer.send('window-close'),
-
-  // Provider (generic)
-  sendToProvider: (chatId: string, message: string, images?: string[]) => {
-    console.log('[Preload] sendToProvider CALLED - chatId:', chatId, 'message length:', message.length, 'images:', images?.length || 0)
-    return ipcRenderer.invoke('send-to-provider', chatId, message, images)
-  },
-  startProvider: (projectPath: string, config?: { model?: string; effort?: string; webSearch?: boolean }) =>
+  // Provider
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>) =>
     ipcRenderer.invoke('start-provider', projectPath, config),
+  sendToProvider: (chatId: string, message: string, images?: string[]) =>
+    ipcRenderer.invoke('send-to-provider', chatId, message, images),
   stopProvider: () => ipcRenderer.invoke('stop-provider'),
   restartProvider: () => ipcRenderer.invoke('restart-provider'),
   getProviderConfig: () => ipcRenderer.invoke('get-provider-config'),
-  saveProviderConfig: (config: any) => ipcRenderer.invoke('save-provider-config', config),
+  saveProviderConfig: (config: Partial<ProviderConfig>) =>
+    ipcRenderer.invoke('save-provider-config', config),
   getAvailableProviders: () => ipcRenderer.invoke('get-available-providers'),
-  setActiveProvider: (providerId: string, config?: any) =>
-    ipcRenderer.invoke('set-active-provider', providerId, config),
+  getProviderModels: () => ipcRenderer.invoke('get-provider-models'),
+  // Alias for backward compatibility
   getAvailableModels: () => ipcRenderer.invoke('get-provider-models'),
+  setActiveProvider: (providerId: string, config?: Partial<ProviderConfig>) =>
+    ipcRenderer.invoke('set-active-provider', providerId, config),
 
-  // Provider Events (generic)
-  onProviderOutput: (callback: (data: string) => void) => {
-    const listener = (_event: IpcRendererEvent, data: string) => {
-      console.log('[Preload] onProviderOutput RECEIVED from main - data length:', data.length)
-      callback(data)
-    }
-    ipcRenderer.on('provider-output', listener)
-    return () => ipcRenderer.off('provider-output', listener)
-  },
-  onProviderError: (callback: (data: string) => void) => {
-    const listener = (_event: IpcRendererEvent, data: string) => {
-      console.log('[Preload] onProviderError RECEIVED from main - error:', data)
-      callback(data)
-    }
-    ipcRenderer.on('provider-error', listener)
-    return () => ipcRenderer.off('provider-error', listener)
-  },
-  onProviderExit: (callback: (code: number) => void) => {
-    const listener = (_event: IpcRendererEvent, code: number) => {
-      console.log('[Preload] onProviderExit RECEIVED from main - code:', code)
-      callback(code)
-    }
-    ipcRenderer.on('provider-exit', listener)
-    return () => ipcRenderer.off('provider-exit', listener)
-  },
+  // Files
+  openFile: (path: string) => ipcRenderer.invoke('open-file', path),
+  getFileInfo: (path: string) => ipcRenderer.invoke('get-file-info', path),
+  readFile: (path: string) => ipcRenderer.invoke('read-file', path),
+  writeFile: (path: string, content: string) => ipcRenderer.invoke('write-file', path, content),
+  listFiles: (dirPath: string) => ipcRenderer.invoke('list-files', dirPath),
 
-  // Process Manager Events - espelham EXATAMENTE o formato do main.ts
-  // main.ts: sendToRenderer('process-started', { name, command, args })
-  onProcessStarted: (callback: (data: { name: string; command: string; args: string[] }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { name: string; command: string; args: string[] }) => callback(data)
-    ipcRenderer.on('process-started', listener)
-    return () => ipcRenderer.off('process-started', listener)
-  },
-  // main.ts: sendToRenderer('process-stopped', { name, code })
-  onProcessStopped: (callback: (data: { name: string; code: number | null }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { name: string; code: number | null }) => callback(data)
-    ipcRenderer.on('process-stopped', listener)
-    return () => ipcRenderer.off('process-stopped', listener)
-  },
-  // main.ts: sendToRenderer('process-error', { name, error })
-  onProcessError: (callback: (data: { name: string; error: string }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { name: string; error: string }) => callback(data)
-    ipcRenderer.on('process-error', listener)
-    return () => ipcRenderer.off('process-error', listener)
-  },
-  // main.ts: sendToRenderer('process-output', { processName, output })
-  onProcessOutput: (callback: (data: { processName: string; output: string }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { processName: string; output: string }) => callback(data)
-    ipcRenderer.on('process-output', listener)
-    return () => ipcRenderer.off('process-output', listener)
-  },
-  // main.ts: sendToRenderer('process-restarting', { processName, attempt })
-  onProcessRestarting: (callback: (data: { processName: string; attempt: number }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { processName: string; attempt: number }) => callback(data)
-    ipcRenderer.on('process-restarting', listener)
-    return () => ipcRenderer.off('process-restarting', listener)
-  },
-  // main.ts: sendToRenderer('process-status', { processName, status, details }) via status-changed
-  onProcessStatus: (callback: (data: { processName: string; status: string; details?: string }) => void) => {
-    const listener = (_event: IpcRendererEvent, data: { processName: string; status: string; details?: string }) => callback(data)
-    ipcRenderer.on('process-status', listener)
-    return () => ipcRenderer.off('process-status', listener)
-  },
+  // Process events (from ProcessManager via main.ts)
+  onProcessStatus: (callback: (event: ProcessStatusEvent) => void) =>
+    createIpcListener<ProcessStatusEvent>('process-status', callback),
+  onProcessError: (callback: (event: ProcessErrorEvent) => void) =>
+    createIpcListener<ProcessErrorEvent>('process-error', callback),
+  onProcessStopped: (callback: (event: ProcessStoppedEvent) => void) =>
+    createIpcListener<ProcessStoppedEvent>('process-stopped', callback),
+  onProcessRestarting: (callback: (event: ProcessRestartingEvent) => void) =>
+    createIpcListener<ProcessRestartingEvent>('process-restarting', callback),
+  onProcessStarted: (callback: (event: ProcessStartedEvent) => void) =>
+    createIpcListener<ProcessStartedEvent>('process-started', callback),
+  onProcessOutput: (callback: (event: ProcessOutputEvent) => void) =>
+    createIpcListener<ProcessOutputEvent>('process-output', callback),
+
+  // Provider events (from ProviderManager via main.ts)
+  onProviderOutput: (callback: (data: string) => void) =>
+    createIpcListener<string>('provider-output', callback),
+  onProviderError: (callback: (error: string) => void) =>
+    createIpcListener<string>('provider-error', callback),
+  onProviderExit: (callback: (code: number) => void) =>
+    createIpcListener<number>('provider-exit', callback),
 })
 
-export type { ElectronAPI }
+export {}

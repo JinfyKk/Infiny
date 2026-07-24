@@ -50,7 +50,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     try {
       const models = await window.electronAPI.getAvailableModels()
       if (models.length > 0) {
-        return models.map((m) => ({
+        return models.map((m: any) => ({
           value: m.value,
           label: m.label,
           description: m.description,
