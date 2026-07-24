@@ -3,6 +3,7 @@ import { ProviderConfig } from '../Provider'
 /**
  * Provedores gratuitos suportados pelo free-claude-code (fcc-server).
  * Cada um mapeia para um provedor real (OpenRouter, Groq, etc.)
+ * Baseado no provider_catalog.py do free-claude-code.
  */
 export type FreeClaudeProviderId =
   | 'openrouter'
@@ -15,10 +16,26 @@ export type FreeClaudeProviderId =
   | 'together'
   | 'xai'
   | 'mistral'
+  | 'mistral_codestral'
   | 'nvidia'
   | 'bedrock'
   | 'vertex'
   | 'cloudflare'
+  | 'huggingface'
+  | 'github_models'
+  | 'wafer'
+  | 'kimi'
+  | 'kimi_code'
+  | 'minimax'
+  | 'fireworks'
+  | 'sambanova'
+  | 'zai'
+  | 'opencode'
+  | 'opencode_go'
+  | 'vercel'
+  | 'ollama_cloud'
+  | 'lmstudio'
+  | 'llamacpp'
   | 'custom'
 
 /**

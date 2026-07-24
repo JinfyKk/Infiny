@@ -3,6 +3,45 @@ import type { FreeClaudeProviderId } from './FreeClaudeConfig'
 import { ProcessManager, ProcessInfo } from '../../main/process/ProcessManager'
 
 /**
+ * Mapeamento de FreeClaudeProviderId para a environment variable
+ * correspondente à API key do provedor (credential_env do provider_catalog.py).
+ * Provedores locais (ollama, lmstudio, llamacpp, vertex) não usam API key via env var.
+ */
+const PROVIDER_API_KEY_ENV: Record<FreeClaudeProviderId, string | undefined> = {
+  openrouter: 'OPENROUTER_API_KEY',
+  groq: 'GROQ_API_KEY',
+  ollama: undefined, // local, sem API key
+  gemini: 'GEMINI_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  cohere: 'COHERE_API_KEY',
+  cerebras: 'CEREBRAS_API_KEY',
+  together: 'TOGETHER_API_KEY',
+  xai: 'XAI_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  mistral_codestral: 'CODESTRAL_API_KEY',
+  nvidia: 'NVIDIA_NIM_API_KEY',
+  bedrock: 'AWS_BEARER_TOKEN_BEDROCK',
+  vertex: undefined, // usa ADC (Application Default Credentials)
+  cloudflare: 'CLOUDFLARE_API_TOKEN', // também precisa CLOUDFLARE_ACCOUNT_ID
+  huggingface: 'HUGGINGFACE_API_KEY',
+  github_models: 'GITHUB_MODELS_TOKEN',
+  wafer: 'WAFER_API_KEY',
+  kimi: 'KIMI_API_KEY',
+  kimi_code: 'KIMI_CODE_API_KEY',
+  minimax: 'MINIMAX_API_KEY',
+  fireworks: 'FIREWORKS_API_KEY',
+  sambanova: 'SAMBANOVA_API_KEY',
+  zai: 'ZAI_API_KEY',
+  opencode: 'OPENCODE_API_KEY',
+  opencode_go: 'OPENCODE_API_KEY',
+  vercel: 'AI_GATEWAY_API_KEY',
+  ollama_cloud: 'OLLAMA_API_KEY',
+  lmstudio: undefined, // local, sem API key
+  llamacpp: undefined, // local, sem API key
+  custom: undefined, // usuário define manualmente
+}
+
+/**
  * Provider para Free Claude Code (via free-claude-code proxy).
  *
  * Arquitetura NOVA (ProcessManager genérico):
@@ -142,37 +181,81 @@ export class FreeClaudeProvider implements AIProvider {
   /**
    * Spawna o fcc-server proxy.
    *
-   * CORRIGIDO (bug ENOENT): o executável instalado via .local/bin no Windows
-   * é "fcc-server.exe", não "fcc-server.cmd". O código anterior fixava
-   * ".cmd", que nunca existiu, causando spawn ENOENT e loop de restart.
+   * IMPORTANTE: O fcc-server NÃO aceita argumentos CLI para configuração
+   * (exceto --version). Toda configuração vem via environment variables.
+   * Fonte: free-claude-code/src/free_claude_code/cli/commands.py:serve()
    *
-   * Além disso, passamos shell:true no Windows para que a resolução de
-   * extensão (.exe/.cmd/.bat via PATHEXT) funcione de forma robusta,
-   * igual ao comportamento do PowerShell — assim ficamos protegidos mesmo
-   * se uma instalação futura gerar um shim .cmd em vez de um .exe nativo.
+   * Variáveis esperadas (conforme settings.py e provider_catalog.py):
+   * - OPENROUTER_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, etc. (baseado no freeProvider)
+   * - ANTHROPIC_AUTH_TOKEN (token do proxy, padrão 'freecc')
+   * - MODEL (opcional, default no settings.py: nvidia_nim/nvidia/nemotron-3-super-120b-a12b)
+   *
+   * O servidor sobe em host=0.0.0.0 port=8082 (hardcoded defaults no free-claude-code).
    */
   private async spawnFccServer(): Promise<void> {
     console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer START')
     const pm = this.processManager!
     const projectPath = this.config!.projectPath || process.cwd()
-    const freeProvider = this.config!.freeProvider || 'openrouter'
+    const freeProvider = (this.config!.freeProvider || 'openrouter') as FreeClaudeProviderId
     const apiKey = (this.config as any).apiKey
 
-    // Build fcc-server command
-    const isWindows = process.platform === 'win32'
+    // fcc-server NÃO aceita argumentos de configuração (--provider, --port, --host, etc.)
+    // Toda configuração é via environment variables
     const fccServerCmd = await this.findFccServerExecutable()
-    const fccServerArgs = [
-      '--provider', freeProvider,
-      '--port', '8082',
-      '--host', '127.0.0.1',
+    const fccServerArgs: string[] = [] // NENHUM argumento - fcc-server não suporta
+
+    // Constrói env vars corretas para o fcc-server
+    const env = this.buildFccServerEnv(freeProvider, apiKey)
+
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer spawning:', fccServerCmd, '(no args)')
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer config:', {
+      projectPath,
+      freeProvider,
+      port: 8082,
+      host: '0.0.0.0 (fcc-server default)',
+      apiKeyEnvVar: this.getProviderApiKeyEnvVar(freeProvider) || 'N/A (local provider)',
+      apiKeyPresent: !!apiKey,
+      authTokenEnvVar: 'ANTHROPIC_AUTH_TOKEN',
+      isWindows: process.platform === 'win32',
+    })
+
+    // Log das env vars relevantes sendo passadas (sem valores sensíveis)
+    const relevantEnvVars = [
+      'ANTHROPIC_AUTH_TOKEN',
+      'OPENROUTER_API_KEY',
+      'GROQ_API_KEY',
+      'GEMINI_API_KEY',
+      'DEEPSEEK_API_KEY',
+      'MISTRAL_API_KEY',
+      'CODESTRAL_API_KEY',
+      'NVIDIA_NIM_API_KEY',
+      'AWS_BEARER_TOKEN_BEDROCK',
+      'HUGGINGFACE_API_KEY',
+      'COHERE_API_KEY',
+      'GITHUB_MODELS_TOKEN',
+      'SAMBANOVA_API_KEY',
+      'ZAI_API_KEY',
+      'FIREWORKS_API_KEY',
+      'CLOUDFLARE_API_TOKEN',
+      'CLOUDFLARE_ACCOUNT_ID',
+      'AI_GATEWAY_API_KEY',
+      'OPENCODE_API_KEY',
+      'WAFER_API_KEY',
+      'KIMI_API_KEY',
+      'KIMI_CODE_API_KEY',
+      'MINIMAX_API_KEY',
+      'CEREBRAS_API_KEY',
+      'VERTEX_PROJECT_ID',
+      'OLLAMA_API_KEY',
+      'MODEL',
     ]
-
-    if (apiKey) {
-      fccServerArgs.push('--api-key', apiKey)
+    const envLog: Record<string, string> = {}
+    for (const key of relevantEnvVars) {
+      if (env[key]) {
+        envLog[key] = key.includes('KEY') || key.includes('TOKEN') || key.includes('SECRET') ? '***SET***' : env[key]!
+      }
     }
-
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer spawning:', fccServerCmd, fccServerArgs.join(' '))
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer config:', { projectPath, freeProvider, port: 8082, host: '127.0.0.1', apiKeyPresent: !!apiKey, isWindows })
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer env vars:', envLog)
 
     await pm.spawn(
       'fcc-server',
@@ -180,18 +263,13 @@ export class FreeClaudeProvider implements AIProvider {
       fccServerArgs,
       {
         cwd: projectPath,
-        env: {
-          ...process.env,
-          FCC_SERVER_PROVIDER: freeProvider,
-          FCC_SERVER_PORT: '8082',
-          FCC_SERVER_HOST: '127.0.0.1',
-        },
+        env,
         windowsHide: true,
-        // Resolve .exe/.cmd/.bat via PATHEXT automaticamente no Windows,
-        // igual o PowerShell faz com Get-Command.
-        shell: isWindows,
+        // Resolve .exe/.cmd/.bat via PATHEXT automaticamente no Windows
+        shell: process.platform === 'win32',
       },
-      // Health check para fcc-server (apenas monitora, NÃO reinicia - waitForServerHealthy() faz isso)
+      // Health check para fcc-server - APENAS monitora, NÃO reinicia
+      // O waitForServerHealthy() faz o monitoramento ativo durante startup
       {
         intervalMs: 5000,
         check: async () => {
@@ -200,19 +278,52 @@ export class FreeClaudeProvider implements AIProvider {
               method: 'GET',
               signal: AbortSignal.timeout(2000),
             })
-            return response.ok || response.status === 404
+            // APENAS 2xx = saudável. 404 NÃO é sucesso (health endpoint deve retornar 200 OK)
+            return response.ok
           } catch {
             return false
           }
         },
-        // REMOVIDO: onFailure que chamava pm.restart(name) - conflitava com waitForServerHealthy()
-        // O waitForServerHealthy() já monitora e trata falhas adequadamente
+        // SEM onFailure aqui - waitForServerHealthy() gerencia falhas
       }
     )
 
-    // Configurar auto-restart para fcc-server
-    pm.configureRestart('fcc-server', 3, 2000)
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer END - process spawned and auto-restart configured')
+    // NÃO configurar auto-restart para fcc-server aqui
+    // O waitForServerHealthy() já trata tentativas e falhas adequadamente
+    // pm.configureRestart('fcc-server', 3, 2000) // REMOVIDO: conflitava com health check ativo
+
+    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer END - process spawned (no auto-restart)')
+  }
+
+  /**
+   * Constrói environment variables para o fcc-server baseado no provedor escolhido.
+   * Mapeia FreeClaudeProviderId para a env var de API key correta (conforme provider_catalog.py).
+   */
+  private buildFccServerEnv(freeProvider: FreeClaudeProviderId, apiKey?: string): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...process.env }
+
+    // Proxy auth token (para proteger o endpoint local se desejado)
+    // freecc é o valor padrão usado pelo wrapper oficial fcc-claude
+    env.ANTHROPIC_AUTH_TOKEN = 'freecc'
+
+    // API Key do provedor selecionado
+    if (apiKey) {
+      const apiKeyEnvVar = this.getProviderApiKeyEnvVar(freeProvider)
+      if (apiKeyEnvVar) {
+        env[apiKeyEnvVar] = apiKey
+      }
+    }
+
+    return env
+  }
+
+  /**
+   * Retorna o nome da environment variable de API key para o provedor.
+   * Baseado no provider_catalog.py do free-claude-code (credential_env).
+   * Retorna undefined para provedores locais (ollama, lmstudio, llamacpp, vertex) que não usam API key via env.
+   */
+  private getProviderApiKeyEnvVar(freeProvider: FreeClaudeProviderId): string | undefined {
+    return PROVIDER_API_KEY_ENV[freeProvider]
   }
 
   /**
@@ -240,10 +351,12 @@ export class FreeClaudeProvider implements AIProvider {
           const response = await fetch(url, { method: 'GET', signal: controller.signal })
           clearTimeout(timeoutId)
 
-          if (response.ok || response.status === 404) {
-            console.log('[DEBUG] [FreeClaudeProvider] waitForServerHealthy() - SUCCESS:', url)
+          // APENAS 2xx = sucesso. 404 NÃO é sucesso (health endpoint deve retornar 200 OK)
+          if (response.ok) {
+            console.log('[DEBUG] [FreeClaudeProvider] waitForServerHealthy() - SUCCESS:', url, 'status:', response.status)
             return
           }
+          console.log('[DEBUG] [FreeClaudeProvider] waitForServerHealthy() - non-OK status:', url, response.status)
         } catch (err) {
           // Ignorar, tentar próximo
           if (attempt % 10 === 1) {
@@ -456,7 +569,7 @@ export class FreeClaudeProvider implements AIProvider {
   }
 
   /**
-   * Configura listeners do ProcessManager para receber stdout/stderr do processo "claude".
+   * Configura listeners do ProcessManager para receber stdout/stderr do processo "claude" e "fcc-server".
    */
   private setupProcessManagerListeners(): void {
     const pm = this.processManager!
@@ -472,13 +585,14 @@ export class FreeClaudeProvider implements AIProvider {
     // guardamos a referência do handler e removemos com pm.off(...) depois,
     // em vez de depender do valor de retorno de .on().
 
-    // Output do processo "claude" (streaming NDJSON)
+    // Output do processo "claude" (streaming NDJSON) e "fcc-server"
     const onOutput = (processName: string, output: string) => {
       console.log('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessOutput', { processName, outputPreview: output.slice(0, 200) })
       if (processName === 'claude') {
         this.handleProviderOutput(output)
       } else if (processName === 'fcc-server') {
-        console.log('[FreeClaudeProvider] [Pipeline] fcc-server output:', output.slice(0, 300))
+        // Log mais verbose do fcc-server para debug
+        console.log('[FreeClaudeProvider] [Pipeline] fcc-server stdout:', output.trim().slice(0, 500))
       }
     }
     pm.on('process-output', onOutput)
@@ -494,9 +608,18 @@ export class FreeClaudeProvider implements AIProvider {
     pm.on('process-error', onError)
     this.pmCleanups.push(() => pm.off('process-error', onError))
 
-    // Saída do processo
+    // Saída do processo - log completo com código de saída e motivo
     const onStopped = (info: ProcessInfo, code: number | null) => {
-      console.log('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessStopped', { processName: info.name, code })
+      const reason = code === 0 ? 'clean exit' : code === null ? 'signal/killed' : `exit code ${code}`
+      console.log('[FreeClaudeProvider] [Pipeline] ProcessManager onProcessStopped', {
+        processName: info.name,
+        code,
+        reason,
+        startedAt: info.startedAt,
+        uptimeMs: Date.now() - info.startedAt,
+        command: info.command,
+        args: info.args.join(' '),
+      })
       if (info.name === 'claude') {
         this.exitCallback?.(code ?? 0)
       }
