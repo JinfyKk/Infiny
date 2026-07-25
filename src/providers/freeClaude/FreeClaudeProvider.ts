@@ -137,7 +137,12 @@ export class FreeClaudeProvider implements AIProvider {
     // 1. Resolver ID do modelo para o provedor gratuito
     console.log('[DEBUG] [FreeClaudeProvider] start() - resolving model ID')
     const { resolveModelId } = await import('./modelMapping')
-    const freeProvider = (this.config.freeProvider ?? 'openrouter') as FreeClaudeProviderId
+    // NOTA: 'nvidia' como padrão porque é o provedor padrão documentado pelo
+    // free-claude-code (NVIDIA NIM tem tier gratuito) e o que já está
+    // configurado com chave ativa. Isso é um valor temporário — o ideal é
+    // isso vir de uma tela de Configurações no Infiny (freeProvider + apiKey
+    // escolhidos pelo usuário), não hardcoded aqui.
+    const freeProvider = (this.config.freeProvider ?? 'nvidia') as FreeClaudeProviderId
     this.resolvedModelId = resolveModelId(
       this.config.model || 'claude-fable-5',
       freeProvider,

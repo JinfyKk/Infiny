@@ -56,6 +56,19 @@ export const DEFAULT_MODEL_MAPPING_DEEPSEEK: Record<string, string> = {
 }
 
 /**
+ * Mapeamento para NVIDIA NIM (build.nvidia.com) — provedor padrão do
+ * free-claude-code, com tier gratuito. Modelo padrão documentado pelo
+ * próprio projeto: nvidia/nemotron-3-super-120b-a12b.
+ */
+export const DEFAULT_MODEL_MAPPING_NVIDIA: Record<string, string> = {
+  'claude-fable-5': 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+  'claude-opus-4-8': 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+  'claude-sonnet-5': 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+  'claude-haiku-4-5-20251001': 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+  'claude-haiku-4-5': 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+}
+
+/**
  * Retorna mapeamento padrão baseado no provedor gratuito.
  */
 export function getDefaultModelMapping(provider: FreeClaudeProviderId): Record<string, string> {
@@ -66,6 +79,8 @@ export function getDefaultModelMapping(provider: FreeClaudeProviderId): Record<s
       return DEFAULT_MODEL_MAPPING_OLLAMA
     case 'deepseek':
       return DEFAULT_MODEL_MAPPING_DEEPSEEK
+    case 'nvidia':
+      return DEFAULT_MODEL_MAPPING_NVIDIA
     case 'openrouter':
     default:
       return DEFAULT_MODEL_MAPPING_OPENROUTER
