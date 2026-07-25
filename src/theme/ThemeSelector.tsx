@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Palette, Sun, Moon, Monitor, Zap, Circle as LucideCircle } from 'lucide-react'
+import { Check, Palette, Sun, Moon, Monitor, Zap, Circle as LucideCircle, TreePine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 import { ThemeName, themeLabels, themeDescriptions } from './themes'
@@ -154,6 +154,10 @@ export function ThemeSelector() {
 
 function getThemePreviewIcon(themeId: ThemeName) {
   switch (themeId) {
+    case 'turtly-light':
+      return <Sun className="w-4 h-4 text-amber-500" />
+    case 'turtly-forest':
+      return <TreePine className="w-4 h-4 text-green-600" />
     case 'pampas':
       return <Sun className="w-4 h-4 text-amber-600" />
     case 'dark-premium':

@@ -299,7 +299,10 @@ export class ClaudeProvider implements AIProvider {
       }
 
       if (parsed.type === 'system' && parsed.subtype === 'init') {
-        return { type: 'system', text: `Sessão iniciada (${parsed.model})` }
+        // Ignore session init message - Claude Code handles its own initialization
+        // Do not create artificial "Sessão iniciada" message
+        console.log('[ClaudeProvider] [Pipeline] parseStreamJson SYSTEM_INIT ignored')
+        return null
       }
 
       if (parsed.type === 'system' && parsed.subtype === 'thinking_tokens') {

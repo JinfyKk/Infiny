@@ -15,13 +15,19 @@ import {
 } from '@/lib/transitions'
 import { useStore } from '@/store/infinyStore'
 
-type ProviderValue = 'claude' | 'openai' | 'gemini' | 'local'
+type ProviderValue = 'free-claude' | 'claude' | 'openai' | 'gemini' | 'local'
 
 const PROVIDERS: DropdownOption[] = [
   {
+    value: 'free-claude',
+    label: 'Free Claude (FCC)',
+    description: 'Claude via proxy gratuito',
+    icon: <Brain className="w-4 h-4" />,
+  },
+  {
     value: 'claude',
     label: 'Claude (Anthropic)',
-    description: 'Modelos de última geração',
+    description: 'Modelos de última geração (requer login)',
     icon: <Brain className="w-4 h-4" />,
   },
   {
@@ -45,6 +51,7 @@ const PROVIDERS: DropdownOption[] = [
 ]
 
 const providerLabels: Record<ProviderValue, string> = {
+  'free-claude': 'Free Claude',
   claude: 'Claude',
   openai: 'OpenAI',
   gemini: 'Gemini',
@@ -68,8 +75,14 @@ export function ProviderSelector() {
   }, [currentProvider])
 
   const handleSelect = useCallback(
-    (providerValue: string) => {
+    async (providerValue: string) => {
       updateSettings({ provider: providerValue as ProviderValue })
+      // Notify main process to switch active provider
+      try {
+        await window.electronAPI?.setActiveProvider(providerValue as ProviderValue)
+      } catch (error) {
+        console.error('[ProviderSelector] Failed to set active provider:', error)
+      }
       setIsOpen(false)
     },
     [updateSettings]

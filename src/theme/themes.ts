@@ -1,4 +1,6 @@
 export type ThemeName =
+  | 'turtly-light'
+  | 'turtly-forest'
   | 'pampas'
   | 'dark-premium'
   | 'tech-blue'
@@ -31,6 +33,13 @@ export interface ThemeTokens {
   'primary-pressed': string
   'primary-soft': string
   'primary-text': string
+
+  // Accent
+  accent: string
+  'accent-hover': string
+  'accent-pressed': string
+  'accent-soft': string
+  'accent-text': string
 
   // Status
   success: string
@@ -105,6 +114,186 @@ export interface ThemeTokens {
 }
 
 export const themes: Record<ThemeName, ThemeTokens> = {
+  // --- 🐢 Turtly Light (Default) ---
+  'turtly-light': {
+    bg: '#F5F3EA',
+    'bg-elevated': '#FFFFFF',
+    'bg-overlay': 'rgba(38, 50, 56, 0.4)',
+
+    text: '#263238',
+    'text-secondary': '#5A6E6E',
+    'text-muted': '#7D8F8F',
+    'text-inverse': '#F5F3EA',
+
+    surface: '#ECE8DD',
+    'surface-hover': '#E0DCCC',
+    'surface-pressed': '#D4CFBF',
+    'surface-border': '#D4CFBF',
+    'surface-border-hover': '#B8B0A0',
+
+    primary: '#6FAF6A',
+    'primary-hover': '#5E9C59',
+    'primary-pressed': '#4D8A48',
+    'primary-soft': '#E8F0E7',
+    'primary-text': '#FFFFFF',
+
+    accent: '#8BC34A',
+    'accent-hover': '#7CB342',
+    'accent-pressed': '#689F38',
+    'accent-soft': '#F1F8E9',
+    'accent-text': '#2E7D32',
+
+    success: '#6FAF6A',
+    'success-soft': '#E8F4E8',
+    warning: '#E8A838',
+    'warning-soft': '#FDF4E0',
+    error: '#C86B6B',
+    'error-soft': '#FBE8E8',
+
+    'glass-bg': 'rgba(236, 232, 221, 0.72)',
+    'glass-border': 'rgba(38, 50, 56, 0.06)',
+    'glass-bg-hover': 'rgba(236, 232, 221, 0.88)',
+    'glass-border-hover': 'rgba(38, 50, 56, 0.1)',
+    'glass-shadow': '0 4px 24px -4px rgba(38, 50, 56, 0.08), 0 2px 8px -2px rgba(38, 50, 56, 0.05)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(38, 50, 56, 0.12), 0 4px 16px -4px rgba(38, 50, 56, 0.08)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
+
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(236, 232, 221, 0.56)',
+    'glass-l1-border': 'rgba(38, 50, 56, 0.04)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(38, 50, 56, 0.04)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(236, 232, 221, 0.72)',
+    'glass-l2-border': 'rgba(38, 50, 56, 0.06)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(38, 50, 56, 0.06), 0 2px 6px -2px rgba(38, 50, 56, 0.04)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(236, 232, 221, 0.82)',
+    'glass-l3-border': 'rgba(38, 50, 56, 0.08)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(38, 50, 56, 0.1), 0 4px 16px -4px rgba(38, 50, 56, 0.06)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(236, 232, 221, 0.9)',
+    'glass-l4-border': 'rgba(38, 50, 56, 0.1)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(38, 50, 56, 0.14), 0 8px 24px -6px rgba(38, 50, 56, 0.08)',
+    'glass-l4-blur': '40px',
+
+    'focus-ring': '#6FAF6A',
+    'focus-ring-offset': '#F5F3EA',
+
+    'radius-sm': '0.25rem',
+    'radius-md': '0.5rem',
+    'radius-lg': '0.75rem',
+    'radius-xl': '1rem',
+    'radius-2xl': '1.25rem',
+    'radius-full': '9999px',
+
+    'shadow-sm': '0 1px 2px 0 rgba(38, 50, 56, 0.05)',
+    'shadow-md': '0 4px 6px -1px rgba(38, 50, 56, 0.1), 0 2px 4px -2px rgba(38, 50, 56, 0.1)',
+    'shadow-lg': '0 10px 15px -3px rgba(38, 50, 56, 0.1), 0 4px 6px -4px rgba(38, 50, 56, 0.1)',
+    'shadow-xl': '0 20px 25px -5px rgba(38, 50, 56, 0.1), 0 8px 10px -6px rgba(38, 50, 56, 0.1)',
+
+    'transition-fast': '100ms ease-out',
+    'transition-normal': '150ms ease-out',
+    'transition-slow': '200ms ease-out',
+    'transition-spring': '300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '100ms',
+    'anim-duration-normal': '150ms',
+    'anim-duration-slow': '200ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+
+  // --- 🌲 Turtly Forest ---
+  'turtly-forest': {
+    bg: '#1D1C1C',
+    'bg-elevated': '#232323',
+    'bg-overlay': 'rgba(241, 241, 232, 0.4)',
+
+    text: '#F1F1E8',
+    'text-secondary': '#B8B8A8',
+    'text-muted': '#8D8D7D',
+    'text-inverse': '#1D1C1C',
+
+    surface: '#2A2A2A',
+    'surface-hover': '#333333',
+    'surface-pressed': '#3A3A3A',
+    'surface-border': '#3A3A3A',
+    'surface-border-hover': '#4A4A4A',
+
+    primary: '#008000',
+    'primary-hover': '#009900',
+    'primary-pressed': '#006600',
+    'primary-soft': '#1A3A1A',
+    'primary-text': '#FFFFFF',
+
+    accent: '#6B8E23',
+    'accent-hover': '#7CB833',
+    'accent-pressed': '#5B9E1B',
+    'accent-soft': '#2A3A10',
+    'accent-text': '#F1F1E8',
+
+    success: '#6FAF6A',
+    'success-soft': '#1A3A1A',
+    warning: '#E8A838',
+    'warning-soft': '#3A2A0A',
+    error: '#C86B6B',
+    'error-soft': '#3A1A1A',
+
+    'glass-bg': 'rgba(42, 42, 42, 0.72)',
+    'glass-border': 'rgba(241, 241, 232, 0.04)',
+    'glass-bg-hover': 'rgba(42, 42, 42, 0.88)',
+    'glass-border-hover': 'rgba(241, 241, 232, 0.08)',
+    'glass-shadow': '0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(107, 142, 35, 0.08)',
+    'glass-shadow-hover': '0 8px 32px -6px rgba(0, 0, 0, 0.5), 0 4px 16px -4px rgba(107, 142, 35, 0.12)',
+    'glass-blur': '24px',
+    'glass-blur-hover': '32px',
+
+    // Glass Depth Levels
+    'glass-l1-bg': 'rgba(42, 42, 42, 0.56)',
+    'glass-l1-border': 'rgba(241, 241, 232, 0.02)',
+    'glass-l1-shadow': '0 2px 8px -2px rgba(0, 0, 0, 0.2)',
+    'glass-l1-blur': '16px',
+    'glass-l2-bg': 'rgba(42, 42, 42, 0.72)',
+    'glass-l2-border': 'rgba(241, 241, 232, 0.04)',
+    'glass-l2-shadow': '0 4px 16px -3px rgba(0, 0, 0, 0.3), 0 2px 6px -2px rgba(0, 0, 0, 0.2)',
+    'glass-l2-blur': '24px',
+    'glass-l3-bg': 'rgba(42, 42, 42, 0.82)',
+    'glass-l3-border': 'rgba(241, 241, 232, 0.06)',
+    'glass-l3-shadow': '0 8px 32px -6px rgba(0, 0, 0, 0.4), 0 4px 16px -4px rgba(0, 0, 0, 0.3)',
+    'glass-l3-blur': '32px',
+    'glass-l4-bg': 'rgba(42, 42, 42, 0.92)',
+    'glass-l4-border': 'rgba(241, 241, 232, 0.08)',
+    'glass-l4-shadow': '0 16px 48px -8px rgba(0, 0, 0, 0.5), 0 8px 24px -6px rgba(0, 0, 0, 0.4)',
+    'glass-l4-blur': '40px',
+
+    'focus-ring': '#6B8E23',
+    'focus-ring-offset': '#1D1C1C',
+
+    'radius-sm': '0.25rem',
+    'radius-md': '0.5rem',
+    'radius-lg': '0.75rem',
+    'radius-xl': '1rem',
+    'radius-2xl': '1.25rem',
+    'radius-full': '9999px',
+
+    'shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.3)',
+    'shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3)',
+    'shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
+    'shadow-xl': '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+
+    'transition-fast': '100ms ease-out',
+    'transition-normal': '150ms ease-out',
+    'transition-slow': '200ms ease-out',
+    'transition-spring': '300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+
+    'anim-duration-fast': '100ms',
+    'anim-duration-normal': '150ms',
+    'anim-duration-slow': '200ms',
+    'anim-easing-standard': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    'anim-easing-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+
   // --- Pampas / Terracota (Obrigatório) ---
   pampas: {
     bg: '#F4F3EE',
@@ -127,6 +316,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-pressed': '#8F472D',
     'primary-soft': '#F5E8E3',
     'primary-text': '#FFFFFF',
+
+    accent: '#D4A574',
+    'accent-hover': '#C89464',
+    'accent-pressed': '#B08354',
+    'accent-soft': '#F5EDE3',
+    'accent-text': '#141413',
 
     success: '#4A7C59',
     'success-soft': '#E5F0E7',
@@ -212,6 +407,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-soft': '#2A2A2B',
     'primary-text': '#0A0A0B',
 
+    accent: '#A5D6A7',
+    'accent-hover': '#81C784',
+    'accent-pressed': '#66BB6A',
+    'accent-soft': '#1A3A1A',
+    'accent-text': '#0A0A0B',
+
     success: '#4ADE80',
     'success-soft': '#14532D',
     warning: '#FACC15',
@@ -295,6 +496,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-pressed': '#2A88E6',
     'primary-soft': '#15304E',
     'primary-text': '#061426',
+
+    accent: '#00E5FF',
+    'accent-hover': '#18FFFF',
+    'accent-pressed': '#00CCD6',
+    'accent-soft': '#0A2A2E',
+    'accent-text': '#061426',
 
     success: '#22D39A',
     'success-soft': '#0A3D2E',
@@ -380,6 +587,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-soft': '#E8F3E8',
     'primary-text': '#FFFFFF',
 
+    accent: '#8BC34A',
+    'accent-hover': '#7CB342',
+    'accent-pressed': '#689F38',
+    'accent-soft': '#F1F8E9',
+    'accent-text': '#1B5E20',
+
     success: '#388E3C',
     'success-soft': '#E8F5E9',
     warning: '#C8962E',
@@ -463,6 +676,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-pressed': '#333333',
     'primary-soft': '#F5F5F5',
     'primary-text': '#FFFFFF',
+
+    accent: '#666666',
+    'accent-hover': '#777777',
+    'accent-pressed': '#555555',
+    'accent-soft': '#F0F0F0',
+    'accent-text': '#FFFFFF',
 
     success: '#006600',
     'success-soft': '#E8F5E8',
@@ -548,6 +767,12 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     'primary-soft': '#0A2A24',
     'primary-text': '#050508',
 
+    accent: '#FF6B35',
+    'accent-hover': '#FF8555',
+    'accent-pressed': '#E05528',
+    'accent-soft': '#2A150A',
+    'accent-text': '#050508',
+
     success: '#00FF88',
     'success-soft': '#0A2A1A',
     warning: '#FFCC00',
@@ -611,6 +836,8 @@ export const themes: Record<ThemeName, ThemeTokens> = {
 };
 
 export const themeLabels: Record<ThemeName, string> = {
+  'turtly-light': '🐢 Turtly Light',
+  'turtly-forest': '🌲 Turtly Forest',
   pampas: 'Pampas / Terracota',
   'dark-premium': 'Dark Premium',
   'tech-blue': 'Tech Blue',
@@ -620,6 +847,8 @@ export const themeLabels: Record<ThemeName, string> = {
 };
 
 export const themeDescriptions: Record<ThemeName, string> = {
+  'turtly-light': 'Claro, natural, moderno e confortável — inspirado na Turtly',
+  'turtly-forest': 'Floresta, escuro elegante, inspirado na natureza',
   pampas: 'Tons quentes de areia e terracota — acolhedor e legível',
   'dark-premium': 'Preto profundo com branco puro — elegante e focado',
   'tech-blue': 'Azul tecnológico escuro — para sessões longas de código',
@@ -628,7 +857,7 @@ export const themeDescriptions: Record<ThemeName, string> = {
   futuristic: 'Ciano neon sobre preto — identidade tech ousada',
 };
 
-export const defaultTheme: ThemeName = 'pampas';
+export const defaultTheme: ThemeName = 'turtly-light';
 
 export function getThemeTokens(name: ThemeName): ThemeTokens {
   return themes[name] ?? themes[defaultTheme];

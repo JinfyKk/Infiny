@@ -41,9 +41,9 @@ export interface GeneratedFile {
 
 export interface Settings {
   model: string
-  effort: 'low' | 'medium' | 'high' | 'max' | 'xhigh'
+  effort: 'low' | 'medium' | 'high' | 'max' | 'xhigh' | 'ultracode'
   webSearch: boolean
-  theme: 'pampas' | 'dark-premium' | 'tech-blue' | 'natural-green' | 'monochrome' | 'futuristic'
+  theme: 'turtly-light' | 'turtly-forest' | 'pampas' | 'dark-premium' | 'tech-blue' | 'natural-green' | 'monochrome' | 'futuristic'
   provider: string
   hasCompletedOnboarding: boolean
 }
@@ -103,8 +103,8 @@ const DEFAULT_SETTINGS: Settings = {
   model: 'claude-fable-5',
   effort: 'low',
   webSearch: false,
-  theme: 'pampas',
-  provider: 'claude',
+  theme: 'turtly-light',
+  provider: 'free-claude',
   hasCompletedOnboarding: false,
 }
 
@@ -506,6 +506,6 @@ export const MODELS = [
   'claude-haiku-4-5',
 ] as const
 
-export const EFFORTS = ['low', 'medium', 'high', 'max', 'xhigh'] as const
+export const EFFORTS = ['low', 'medium', 'high', 'max', 'xhigh', 'ultracode'] as const
 
 export const PROVIDERS = ['claude', 'free-claude', 'gemini', 'codex', 'ollama', 'openrouter', 'nim'] as const

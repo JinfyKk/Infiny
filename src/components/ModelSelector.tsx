@@ -23,9 +23,9 @@ export function ModelSelector({
   const [isLoading, setIsLoading] = useState(false)
 
   const DEFAULT_FALLBACK: ModelOption = {
-    value: 'claude-sonnet-5',
-    label: 'Claude Sonnet 5',
-    description: 'Equilibrado',
+    value: 'claude-fable-5',
+    label: 'Claude Fable 5',
+    description: 'Mais avançado — raciocínio complexo',
     icon: <Brain className="w-4 h-4" />,
   }
 

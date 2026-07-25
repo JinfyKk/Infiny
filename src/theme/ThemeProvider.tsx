@@ -10,11 +10,6 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-// Apply default theme immediately to prevent flash
-if (typeof window !== 'undefined') {
-  applyDSTheme(defaultTheme)
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(defaultTheme)
 
@@ -61,7 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
     setTheme,
-    availableThemes: ['pampas', 'dark-premium', 'tech-blue', 'natural-green', 'monochrome', 'futuristic'] as ThemeName[],
+    availableThemes: ['turtly-light', 'turtly-forest', 'pampas', 'dark-premium', 'tech-blue', 'natural-green', 'monochrome', 'futuristic'] as ThemeName[],
   }), [theme])
 
   return (

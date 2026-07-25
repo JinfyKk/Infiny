@@ -66,9 +66,9 @@ export class FreeClaudeProvider implements AIProvider {
   }
 
   getSupportedEfforts(): string[] {
-    // O Claude Code CLI oficial suporta: low, medium, high
+    // O Claude Code CLI oficial suporta: low, medium, high, max, xhigh, ultracode
     // O free-claude-code proxy repassa --effort para a API.
-    return ['low', 'medium', 'high']
+    return ['low', 'medium', 'high', 'max', 'xhigh', 'ultracode']
   }
 
   supportsWebSearch(): boolean {
@@ -656,9 +656,10 @@ export class FreeClaudeProvider implements AIProvider {
       // Tipo: system - mensagens do sistema
       if (parsed.type === 'system') {
         if (parsed.subtype === 'init') {
-          const initText = `Sessão iniciada (${parsed.model || this.config?.model || 'claude-fable-5'})`
-          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_INIT', initText)
-          return { type: 'system', text: initText }
+          // Ignore session init message - FCC/Claude Code handles its own initialization
+          // Do not create artificial "Sessão iniciada" message
+          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_INIT ignored')
+          return null
         }
         if (parsed.subtype === 'thinking_tokens') {
           console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_THINKING')

@@ -1,9 +1,9 @@
 'use client'
 
-import { Gauge, Battery, Cpu, Zap, Activity } from 'lucide-react'
+import { Gauge, Battery, Cpu, Zap, Activity, BrainCircuit } from 'lucide-react'
 import { Dropdown, DropdownOption } from '@/components/ui/Dropdown'
 
-type EffortValue = 'low' | 'medium' | 'high' | 'max' | 'xhigh'
+type EffortValue = 'low' | 'medium' | 'high' | 'max' | 'xhigh' | 'ultracode'
 
 const EFFORTS: DropdownOption[] = [
   { value: 'low', label: 'Low', description: 'Respostas rápidas, menos tokens', icon: <Battery className="w-4 h-4" /> },
@@ -11,6 +11,7 @@ const EFFORTS: DropdownOption[] = [
   { value: 'high', label: 'High', description: 'Mais detalhado e completo', icon: <Cpu className="w-4 h-4" /> },
   { value: 'max', label: 'Max', description: 'Máximo esforço', icon: <Zap className="w-4 h-4" /> },
   { value: 'xhigh', label: 'XHigh', description: 'Ultra detalhado', icon: <Activity className="w-4 h-4" /> },
+  { value: 'ultracode', label: 'Ultracode', description: 'Máximo poder de codificação', icon: <BrainCircuit className="w-4 h-4" /> },
 ]
 
 interface EffortSelectorProps {

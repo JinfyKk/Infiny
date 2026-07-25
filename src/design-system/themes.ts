@@ -146,6 +146,8 @@ function toDSTokens(theme: typeof originalThemes[keyof typeof originalThemes]): 
 
 // Generate all theme tokens
 export const dsThemes: Record<ThemeName, DSTokens> = {
+  'turtly-light': toDSTokens(originalThemes['turtly-light']),
+  'turtly-forest': toDSTokens(originalThemes['turtly-forest']),
   pampas: toDSTokens(originalThemes.pampas),
   'dark-premium': toDSTokens(originalThemes['dark-premium']),
   'tech-blue': toDSTokens(originalThemes['tech-blue']),
@@ -156,7 +158,7 @@ export const dsThemes: Record<ThemeName, DSTokens> = {
 
 // Helper to get theme tokens
 export function getDSTokens(themeName: ThemeName): DSTokens {
-  return dsThemes[themeName] ?? dsThemes.pampas;
+  return dsThemes[themeName] ?? dsThemes['turtly-light'];
 }
 
 // Apply theme to DOM (enhanced version)
