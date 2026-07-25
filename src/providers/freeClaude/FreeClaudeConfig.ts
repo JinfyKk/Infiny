@@ -1,117 +1,90 @@
 import { ProviderConfig } from '../Provider'
 
 /**
- * Provedores gratuitos suportados pelo free-claude-code (fcc-server).
- * Cada um mapeia para um provedor real (OpenRouter, Groq, etc.)
- * Baseado no provider_catalog.py do free-claude-code.
+ * Configuração simplificada do FreeClaudeProvider.
+ *
+ * ARQUITETURA NOVA (integração nativa):
+ * - O Infiny NÃO configura mais: freeProvider, apiKey, modelMapping, fccServerArgs
+ * - Toda configuração do fcc-server é feita via ~/.config/fcc/.env
+ *   (lido automaticamente pelo Settings do free-claude-code via env_file)
+ * - O provider apenas orquestra: spawn fcc-server → health check → spawn fcc-claude
+ * - Modelos usam nomes Anthropic puros: claude-fable-5, claude-opus-4-8, etc.
+ *   Resolução para modelo real (nvidia_nim/..., openrouter/...) feita pelo fcc-server.
  */
-export type FreeClaudeProviderId =
-  | 'openrouter'
-  | 'groq'
-  | 'ollama'
-  | 'gemini'
-  | 'deepseek'
-  | 'cohere'
-  | 'cerebras'
-  | 'together'
-  | 'xai'
-  | 'mistral'
-  | 'mistral_codestral'
-  | 'nvidia'
-  | 'bedrock'
-  | 'vertex'
-  | 'cloudflare'
-  | 'huggingface'
-  | 'github_models'
-  | 'wafer'
-  | 'kimi'
-  | 'kimi_code'
-  | 'minimax'
-  | 'fireworks'
-  | 'sambanova'
-  | 'zai'
-  | 'opencode'
-  | 'opencode_go'
-  | 'vercel'
-  | 'ollama_cloud'
-  | 'lmstudio'
-  | 'llamacpp'
-  | 'custom'
+export type FreeClaudeProviderId = string // Não mais usado - mantido para compatibilidade se necessário
 
-/**
- * Configuração específica do FreeClaudeProvider.
- * Estende ProviderConfig com opções do fcc-server.
- */
 export interface FreeClaudeConfig extends ProviderConfig {
   /**
-   * Provedor gratuito a usar (ex: 'openrouter', 'groq', 'ollama').
-   * Se não informado, usa o configurado no fcc-server.
+   * @deprecated Não mais usado. Configuração do fcc-server é via ~/.config/fcc/.env
    */
   freeProvider?: FreeClaudeProviderId
 
   /**
-   * API Key do provedor escolhido.
-   * Opcional se já configurada no fcc-server ou variáveis de ambiente.
+   * @deprecated Não mais usado. API Key é configurada no ~/.config/fcc/.env
    */
   apiKey?: string
 
   /**
-   * Porta para o fcc-server (proxy local).
-   * Se não informado, escolhe porta livre automaticamente (8080-8090).
-   */
-  proxyPort?: number
-
-  /**
-   * Host do fcc-server.
-   * Padrão: '127.0.0.1'
-   */
-  proxyHost?: string
-
-  /**
-   * Mapeamento customizado de modelos Anthropic → IDs do provedor.
-   * Ex: { 'sonnet': 'openrouter/anthropic/claude-3.5-sonnet' }
-   * Se não informado, usa mapeamento padrão do fcc-server.
+   * @deprecated Não mais usado. Mapeamento de modelos é feito pelo fcc-server
+   * via MODEL_FABLE, MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU no .env
    */
   modelMapping?: Record<string, string>
 
   /**
-   * Caminho do executável fcc-server.
-   * Se não informado, tenta 'fcc-server' no PATH.
-   */
-  fccServerPath?: string
-
-  /**
-   * Argumentos extras para o fcc-server.
+   * @deprecated Não mais usado. fcc-server não aceita argumentos CLI para configuração
    */
   fccServerArgs?: string[]
 
   /**
-   * Timeout para health check do fcc-server (ms).
-   * Padrão: 10000
+   * Porta do fcc-server (padrão: 8082).
+   * Apenas para health check - o fcc-server usa a porta do seu .env (padrão 8082).
+   */
+  proxyPort?: number
+
+  /**
+   * Host do fcc-server (padrão: '127.0.0.1').
+   */
+  proxyHost?: string
+
+  /**
+   * Timeout para health check do fcc-server (ms). Padrão: 30000
    */
   healthCheckTimeout?: number
 
   /**
-   * Se deve auto-instalar fcc-server via pipx/uv se não encontrado.
-   * Padrão: false (apenas avisa)
+   * @deprecated Não mais usado. Instalação é responsabilidade do usuário via uv/pipx.
    */
   autoInstall?: boolean
 }
 
 /**
- * Configuração padrão para FreeClaudeProvider.
+ * Configuração padrão simplificada.
  */
 export const DEFAULT_FREE_CLAUDE_CONFIG: Partial<FreeClaudeConfig> = {
   proxyHost: '127.0.0.1',
-  proxyPort: undefined, // porta livre automática
-  healthCheckTimeout: 10000,
+  proxyPort: 8082,
+  healthCheckTimeout: 30_000,
   autoInstall: false,
   fccServerArgs: [],
   modelMapping: {},
+  freeProvider: undefined,
+  apiKey: undefined,
 }
 
 /**
- * Modelos Anthropic conhecidos e seus aliases para mapeamento.
+ * Opção de modelo para o ModelSelector.
+ */
+export interface ModelOption {
+  value: string
+  label: string
+  description: string
+}
+
+/**
+ * Modelos Anthropic conhecidos para UI (seleção no ModelSelector).
+ * Estes são NOMES PUROS ANTHROPIC - NÃO IDs de provedor interno.
+ * O fcc-claude recebe --model claude-fable-5 e o fcc-server resolve
+ * internamente via MODEL_FABLE, MODEL_OPUS, etc. configurados no .env.
  */
 export const ANTHROPIC_MODEL_ALIASES: Record<string, string[]> = {
   'claude-fable-5': ['fable-5', 'fable'],
@@ -122,37 +95,52 @@ export const ANTHROPIC_MODEL_ALIASES: Record<string, string[]> = {
 }
 
 /**
- * Mapeamento padrão de modelos Anthropic → Provedores gratuitos (OpenRouter).
- * Usado quando não há modelMapping customizado.
+ * Modelos suportados pela UI (nomes Anthropic puros).
  */
-export const DEFAULT_MODEL_MAPPING_OPENROUTER: Record<string, string> = {
-  'claude-fable-5': 'openrouter/anthropic/claude-3.5-sonnet', // Fable 5 ≈ Sonnet 3.5
-  'claude-opus-4-8': 'openrouter/anthropic/claude-3-opus',
-  'claude-sonnet-5': 'openrouter/anthropic/claude-3.5-sonnet',
-  'claude-haiku-4-5-20251001': 'openrouter/anthropic/claude-3.5-haiku',
-  'claude-haiku-4-5': 'openrouter/anthropic/claude-3.5-haiku',
-}
+export const SUPPORTED_ANTHROPIC_MODELS: string[] = [
+  'claude-fable-5',
+  'claude-opus-4-8',
+  'claude-sonnet-5',
+  'claude-haiku-4-5-20251001',
+  'claude-haiku-4-5',
+]
 
 /**
- * Mapeamento para Groq (modelos rápidos gratuitos).
+ * Label amigável para exibição no ModelSelector.
  */
-export const DEFAULT_MODEL_MAPPING_GROQ: Record<string, string> = {
-  'claude-fable-5': 'groq/llama-3.3-70b-versatile',
-  'claude-opus-4-8': 'groq/llama-3.3-70b-versatile',
-  'claude-sonnet-5': 'groq/llama-3.1-70b-versatile',
-  'claude-haiku-4-5-20251001': 'groq/llama-3.1-8b-instant',
-  'claude-haiku-4-5': 'groq/llama-3.1-8b-instant',
-}
-
-/**
- * Retorna mapeamento padrão baseado no provedor gratuito escolhido.
- */
-export function getDefaultModelMapping(provider: FreeClaudeProviderId): Record<string, string> {
-  switch (provider) {
-    case 'groq':
-      return DEFAULT_MODEL_MAPPING_GROQ
-    case 'openrouter':
-    default:
-      return DEFAULT_MODEL_MAPPING_OPENROUTER
+export function getModelLabel(model: string): string {
+  const labels: Record<string, string> = {
+    'claude-fable-5': 'Claude Fable 5 (Free)',
+    'claude-opus-4-8': 'Claude Opus 4.8 (Free)',
+    'claude-sonnet-5': 'Claude Sonnet 5 (Free)',
+    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5 (Free)',
+    'claude-haiku-4-5': 'Claude Haiku 4.5 (Free)',
   }
+  return labels[model] ?? model
+}
+
+/**
+ * Descrição do modelo para tooltip.
+ */
+export function getModelDescription(model: string): string {
+  const descriptions: Record<string, string> = {
+    'claude-fable-5': 'Mais avançado — raciocínio complexo',
+    'claude-opus-4-8': 'Alta complexidade — análise profunda',
+    'claude-sonnet-5': 'Equilibrado — uso geral',
+    'claude-haiku-4-5-20251001': 'Rápido e eficiente',
+    'claude-haiku-4-5': 'Rápido e eficiente',
+  }
+  return descriptions[model] ?? 'Modelo personalizado'
+}
+
+/**
+ * Obtém todas as opções de modelo formatadas para o ModelSelector.
+ * Não depende mais de provedor - retorna todos os modelos Anthropic suportados.
+ */
+export function getModelOptionsForProvider(_provider?: string): ModelOption[] {
+  return SUPPORTED_ANTHROPIC_MODELS.map((model) => ({
+    value: model,
+    label: getModelLabel(model),
+    description: getModelDescription(model),
+  }))
 }

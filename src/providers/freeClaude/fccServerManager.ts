@@ -1,11 +1,21 @@
-import { FreeClaudeConfig, DEFAULT_FREE_CLAUDE_CONFIG } from './FreeClaudeConfig'
+import { FreeClaudeConfig } from './FreeClaudeConfig'
 import { spawn, ChildProcess, SpawnOptions } from 'child_process'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
 /**
  * Gerencia o ciclo de vida do fcc-server (proxy local do free-claude-code).
- * Encapsula spawn, health check, e cleanup do processo do servidor proxy.
+ *
+ * NOVA ARQUITETURA:
+ * - fcc-server NÃO aceita argumentos de configuração (exceto --version).
+ * - Toda configuração vem via environment variables carregadas do ~/.config/fcc/.env
+ *   pelo Settings do free-claude-code (pydantic-settings).
+ * - Fonte: free-claude-code/src/free_claude_code/cli/commands.py:serve()
+ *
+ * Responsabilidades:
+ * - Spawn fcc-server
+ * - Health check (HTTP /health ou /v1/models)
+ * - Cleanup
  */
 export class FCCServerManager {
   private process: ChildProcess | null = null
@@ -16,7 +26,7 @@ export class FCCServerManager {
   private startPromise: Promise<void> | null = null
 
   constructor(config: FreeClaudeConfig) {
-    this.config = { ...DEFAULT_FREE_CLAUDE_CONFIG, ...config } as FreeClaudeConfig
+    this.config = { ...config } as FreeClaudeConfig
     this.host = this.config.proxyHost ?? '127.0.0.1'
     this.port = this.config.proxyPort ?? this.findFreePort()
   }
@@ -51,11 +61,13 @@ export class FCCServerManager {
       )
     }
 
-    // 2. Preparar argumentos
-    const args = this.buildServerArgs()
+    // 2. fcc-server NÃO aceita argumentos de configuração
+    // Toda configuração vem via environment variables (~/.config/fcc/.env)
+    const args: string[] = []
+
     const options = this.buildSpawnOptions()
 
-    console.log('[FCCServerManager] Iniciando:', fccServerPath, args.join(' '))
+    console.log('[FCCServerManager] Iniciando:', fccServerPath, '(no args)')
     console.log('[FCCServerManager] Diretório de trabalho:', options.cwd)
 
     // 3. Spawn do processo
@@ -101,7 +113,7 @@ export class FCCServerManager {
     } else {
       candidates.push(
         join(home, '.local', 'bin', 'fcc-server'),
-        join(home, '.cargo', 'bin', 'fcc-server'), // se instalado via cargo
+        join(home, '.cargo', 'bin', 'fcc-server'),
         '/usr/local/bin/fcc-server',
         '/opt/homebrew/bin/fcc-server'
       )
@@ -117,38 +129,13 @@ export class FCCServerManager {
 
     // Tentar no PATH (spawn com shell)
     console.log('[FCCServerManager] Tentando fcc-server via PATH/shell')
-    return baseName // spawn com shell=true tentará encontrar no PATH
-  }
-
-  /**
-   * Constrói argumentos para o fcc-server.
-   */
-  private buildServerArgs(): string[] {
-    const args = [
-      '--host', this.host,
-      '--port', String(this.port),
-    ]
-
-    // Provedor gratuito (se especificado)
-    if (this.config.freeProvider) {
-      args.push('--provider', this.config.freeProvider)
-    }
-
-    // API Key (se especificada)
-    if (this.config.apiKey) {
-      args.push('--api-key', this.config.apiKey)
-    }
-
-    // Argumentos extras da config
-    if (this.config.fccServerArgs && this.config.fccServerArgs.length > 0) {
-      args.push(...this.config.fccServerArgs)
-    }
-
-    return args
+    return baseName
   }
 
   /**
    * Constrói opções de spawn.
+   * SEM variáveis de ambiente FCC_PROVIDER, FCC_API_KEY, etc.
+   * O fcc-server lê sua configuração do ~/.config/fcc/.env
    */
   private buildSpawnOptions(): SpawnOptions {
     const isWindows = process.platform === 'win32'
@@ -158,12 +145,10 @@ export class FCCServerManager {
       cwd: this.config.projectPath || process.cwd(),
       env: {
         ...process.env,
-        // Configurações do free-claude-code
-        FCC_PROVIDER: this.config.freeProvider || '',
-        FCC_API_KEY: this.config.apiKey || '',
-        FCC_MODEL_MAPPING: this.config.modelMapping
-          ? JSON.stringify(this.config.modelMapping)
-          : '',
+        // NÃO configurar:
+        // FCC_PROVIDER, FCC_API_KEY, FCC_MODEL_MAPPING
+        // ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN
+        // O fcc-server gerencia tudo internamente via seu .env
       },
       shell: useShell,
       windowsHide: true,
@@ -236,16 +221,15 @@ export class FCCServerManager {
 
     throw new Error(
       `Timeout aguardando fcc-server ficar pronto (${timeout}ms). ` +
-      `Verifique logs em [FCCServerManager stderr]. Porta: ${this.port}`
+        `Verifique logs em [FCCServerManager stderr]. Porta: ${this.port}`
     )
   }
 
   /**
    * Encontra porta livre no range 8080-8090.
+   * Em produção, deveria verificar disponibilidade real.
    */
   private findFreePort(): number {
-    // Por simplicidade, usa porta fixa inicial + offset aleatório
-    // Em produção, deveria verificar disponibilidade real
     return 8080 + Math.floor(Math.random() * 10)
   }
 
@@ -281,28 +265,39 @@ export class FCCServerManager {
    * Para o servidor graciosamente.
    */
   async stop(): Promise<void> {
-    if (this.process) {
-      console.log('[FCCServerManager] Parando servidor...')
-      this.process.kill('SIGINT')
-      this.process = null
-      this.started = false
+    if (!this.process) return
 
-      // Aguardar um pouco para processo terminar
-      await new Promise((r) => setTimeout(r, 500))
-    }
-    this.startPromise = null
-  }
+    const childProcess = this.process
+    console.log('[FCCServerManager] Parando servidor...')
 
-  /**
-   * Força parada imediata (SIGKILL).
-   */
-  async kill(): Promise<void> {
-    if (this.process) {
-      console.log('[FCCServerManager] Matando servidor (SIGKILL)...')
-      this.process.kill('SIGKILL')
-      this.process = null
-      this.started = false
-    }
-    this.startPromise = null
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (childProcess && !childProcess.killed) {
+          if (process.platform === 'win32' && childProcess.pid) {
+            // Force kill tree no Windows
+            const { exec } = require('child_process')
+            exec(`taskkill /PID ${childProcess.pid} /T /F`)
+          } else {
+            childProcess.kill('SIGKILL')
+          }
+        }
+        resolve()
+      }, 3000)
+
+      childProcess.once('close', () => {
+        clearTimeout(timer)
+        this.process = null
+        this.started = false
+        this.startPromise = null
+        resolve()
+      })
+
+      if (process.platform === 'win32' && childProcess.pid) {
+        const { exec } = require('child_process')
+        exec(`taskkill /PID ${childProcess.pid} /T /F`)
+      } else {
+        childProcess.kill('SIGINT')
+      }
+    })
   }
 }
