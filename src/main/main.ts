@@ -50,6 +50,18 @@ providerManager.registerProvider('free-claude', (manager) => new FreeClaudeProvi
 // Process Manager - gerenciador genérico de processos filhos (inicializado lazy)
 let processManager: ProcessManager | null = null
 
+// Cache do último status conhecido de cada processo.
+// Necessário porque eventos como "fcc-server: running" podem ser emitidos
+// (e enviados via sendToRenderer) ANTES do renderer terminar de montar e
+// registrar seus listeners de IPC — nesse caso o evento se perde. O
+// SplashScreen consulta esse cache ao montar para não ficar preso.
+const processStatusCache = new Map<string, { status: string; details?: string }>()
+
+// Mesma lógica de cache para os eventos "provider-healthy" e "provider-ready",
+// que também podem disparar antes do SplashScreen estar escutando.
+let providerHealthyFired = false
+let providerReadyFired = false
+
 // Configuração padrão do provedor ativo (persistida no config.json)
 let activeProviderId = 'free-claude' // Default para free-claude (sem login)
 let activeProviderConfig: ProviderConfig = {
@@ -138,6 +150,7 @@ function getProcessManager(): ProcessManager {
 
     processManager.on('status-changed', (processName: string, status: ProcessInfo['status'], details?: string) => {
       console.log('[Main] [ProcessManager] status-changed:', { processName, status, details })
+      processStatusCache.set(processName, { status, details })
       sendToRenderer('process-status', { processName, status, details })
     })
 
@@ -247,6 +260,7 @@ function setupProviderListeners(): void {
 
   providerManager.onReady(() => {
     console.log('[Main] [ProviderManager] provider-ready event received, forwarding to renderer')
+    providerReadyFired = true
     sendToRenderer('provider-ready', { providerId: activeProviderId })
   })
 }
@@ -290,6 +304,7 @@ async function initializeActiveProvider(projectPath: string): Promise<void> {
       console.log('[Main] [Pipeline] Registering onHealthy callback for FreeClaudeProvider')
       ;(provider as any).onHealthy(() => {
         console.log('[Main] [Pipeline] FreeClaudeProvider healthy, forwarding to renderer')
+        providerHealthyFired = true
         sendToRenderer('provider-healthy', {})
       })
     }
@@ -405,6 +420,27 @@ ipcMain.handle('delete-project', (_event, name: string) => {
 // ============================================
 // IPC HANDLERS - PROVIDER
 // ============================================
+
+/**
+ * Retorna o snapshot atual de status conhecido no momento da chamada.
+ *
+ * Existe para resolver a race condition em que o main process inicia o
+ * FreeClaudeProvider (e portanto emite "fcc-server: running") logo após
+ * createWindow(), antes do renderer terminar de montar o SplashScreen e
+ * registrar seus listeners de IPC. Sem isso, o evento se perde e o step
+ * correspondente nunca sai de "pending".
+ */
+ipcMain.handle('get-process-status-snapshot', () => {
+  return {
+    processes: Array.from(processStatusCache.entries()).map(([processName, s]) => ({
+      processName,
+      status: s.status,
+      details: s.details,
+    })),
+    providerHealthy: providerHealthyFired,
+    providerReady: providerReadyFired,
+  }
+})
 
 /**
  * Inicia o provedor para um projeto.

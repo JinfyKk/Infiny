@@ -26,6 +26,23 @@ interface Step {
   message?: string
 }
 
+// Tipagem explícita do retorno de getProcessStatusSnapshot(). Declarada aqui
+// em vez de depender só da inferência via window.electronAPI, pra não dar
+// TS7006 (parâmetro implicitamente "any") caso a tipagem global do preload
+// não seja resolvida nesse ponto (ex.: cache de tipos do editor, tsconfig
+// do renderer sem o .d.ts incluído, etc.).
+interface ProcessStatusEntry {
+  processName: string
+  status: string
+  details?: string
+}
+
+interface ProcessStatusSnapshot {
+  processes: ProcessStatusEntry[]
+  providerHealthy: boolean
+  providerReady: boolean
+}
+
 export function SplashScreen({ onComplete }: SplashScreenProps) {
   const completedRef = useRef(false)
 
@@ -60,6 +77,44 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
 
 
   useEffect(() => {
+
+    // Alguns processos (ex.: fcc-server) podem já ter chegado a "running"
+    // ANTES deste componente montar e registrar os listeners abaixo — nesse
+    // caso o evento correspondente já foi disparado e se perdeu. Por isso
+    // consultamos o snapshot atual assim que montamos, para não ficar preso
+    // esperando um evento que já aconteceu.
+    window.electronAPI?.getProcessStatusSnapshot?.().then((snapshot: ProcessStatusSnapshot | undefined) => {
+      if (!snapshot) return
+
+      const processNameToStepId: Record<string, string> = {
+        'fcc-server': 'server',
+        'claude': 'claude',
+      }
+
+      setSteps((prev) =>
+        prev.map((step) => {
+          const entry = snapshot.processes.find(
+            (p: ProcessStatusEntry) => processNameToStepId[p.processName] === step.id
+          )
+
+          if (entry?.status === 'running') {
+            return { ...step, status: 'completed', message: entry.details || 'Pronto' }
+          }
+
+          if (step.id === 'health' && snapshot.providerHealthy) {
+            return { ...step, status: 'completed', message: 'Servidor saudável' }
+          }
+
+          if (step.id === 'connect' && snapshot.providerReady) {
+            return { ...step, status: 'completed', message: 'Conectado' }
+          }
+
+          return step
+        })
+      )
+    }).catch((err: unknown) => {
+      console.error('[SplashScreen] falha ao buscar snapshot de status:', err)
+    })
 
     const handleStatus = (
       data: {
