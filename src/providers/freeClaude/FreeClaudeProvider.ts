@@ -489,7 +489,6 @@ export class FreeClaudeProvider implements AIProvider {
     const isWindows = process.platform === 'win32'
     const config = this.config!
     const baseArgs = [
-      '--print',
       '--model', this.resolvedModelId,
       '--effort', config.effort || 'low',
       '--output-format=stream-json',

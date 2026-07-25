@@ -354,15 +354,13 @@ export class ProcessManager extends EventEmitter {
 
       child.once(
         'close',
-        code => {
+        () => {
 
           clearTimeout(timer)
 
-          this.handleProcessExit(
-            name,
-            code
-          )
-
+          // NÃO chame handleProcessExit aqui — o handler .on('close') registrado
+          // no spawn() já faz isso. Evita double-call que consumiria a flag
+          // intentionalStops e dispararia auto-restart indesejado.
           resolve()
         }
       )
