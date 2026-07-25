@@ -81,8 +81,9 @@ export class FreeClaudeProvider implements AIProvider {
   // Cleanup functions for ProcessManager listeners
   private pmCleanups: Array<() => void> = []
 
-  // Lock para evitar start/stop concorrentes
-  private _startStopLock = false
+  // Fila de operações para evitar start/stop concorrentes.
+  // Encadeia promises: cada chamada de start()/stop() aguarda a operação anterior terminar.
+  private _opQueue: Promise<void> = Promise.resolve()
 
   constructor(_providerManager: ProviderManager) {
     console.log('[DEBUG] [FreeClaudeProvider] constructor called')
@@ -128,17 +129,14 @@ export class FreeClaudeProvider implements AIProvider {
   /**
    * Inicializa o provider para um projeto.
    * Spawna fcc-server e claude CLI via ProcessManager.
+   *
+   * Usa fila de operações (_opQueue) para serializar chamadas concorrentes.
+   * Cada chamada aguarda a operação anterior terminar antes de prosseguir.
    */
   async start(config: ProviderConfig): Promise<void> {
-    // Evitar start/stop concorrentes
-    if (this._startStopLock) {
-      console.warn('[FreeClaudeProvider] start() - already in progress, skipping')
-      return
-    }
-    this._startStopLock = true
-
-    try {
-      console.log('[DEBUG] [FreeClaudeProvider] start() - START')
+    // Adicionar à fila de operações - aguarda operação anterior terminar
+    this._opQueue = this._opQueue.then(async () => {
+      console.log('[DEBUG] [FreeClaudeProvider] start() - START (queue)')
       this.config = { ...config } as ProviderConfig & { freeProvider?: string }
 
       console.log('[DEBUG] [FreeClaudeProvider] start() - config:', {
@@ -204,9 +202,10 @@ export class FreeClaudeProvider implements AIProvider {
       // 7. Emitir evento de provider pronto
       console.log('[DEBUG] [FreeClaudeProvider] start() - emitting provider-ready event')
       this.readyCallback?.()
-    } finally {
-      this._startStopLock = false
-    }
+    })
+
+    // Aguardar a operação na fila completar
+    await this._opQueue
   }
 
   /**
@@ -747,17 +746,14 @@ export class FreeClaudeProvider implements AIProvider {
 
   /**
    * Para o provider graciosamente via ProcessManager.
+   *
+   * Usa fila de operações (_opQueue) para serializar chamadas concorrentes.
+   * Cada chamada aguarda a operação anterior terminar antes de prosseguir.
    */
   async stop(): Promise<void> {
-    // Evitar start/stop concorrentes
-    if (this._startStopLock) {
-      console.warn('[FreeClaudeProvider] stop() - already in progress, skipping')
-      return
-    }
-    this._startStopLock = true
-
-    try {
-      console.log('[FreeClaudeProvider] Stopping...')
+    // Adicionar à fila de operações - aguarda operação anterior terminar
+    this._opQueue = this._opQueue.then(async () => {
+      console.log('[FreeClaudeProvider] Stopping... (queue)')
 
       try {
         if (this.processManager) {
@@ -779,9 +775,10 @@ export class FreeClaudeProvider implements AIProvider {
       this.resolvedModelId = ''
       this.messageBuffer = ''
       console.log('[FreeClaudeProvider] Stopped')
-    } finally {
-      this._startStopLock = false
-    }
+    })
+
+    // Aguardar a operação na fila completar
+    await this._opQueue
   }
 
   /**

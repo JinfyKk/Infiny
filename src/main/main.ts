@@ -400,6 +400,11 @@ ipcMain.handle('load-project', (_event, name: string) => {
   if (project) {
     project.lastOpened = Date.now()
     saveProject(project)
+
+    // Atualizar lastProject no config.json para persistir seleção do usuário
+    const config = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'))
+    config.lastProject = name
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
   }
   return project
 })

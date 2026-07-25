@@ -64,6 +64,9 @@ export class ProcessManager extends EventEmitter {
     }
   >()
 
+  // Buffer de saída para capturar stdout/stderr completo (útil para debug de falhas)
+  private outputBuffers = new Map<string, { stdout: string[]; stderr: string[] }>()
+
   // Guarda os últimos parâmetros usados no spawn() de cada processo,
   // para permitir restart() sem que o chamador precise repassar tudo de novo.
   private spawnParams = new Map<string, SpawnParams>()
@@ -112,6 +115,10 @@ export class ProcessManager extends EventEmitter {
 
 
     this.processes.set(name, info)
+
+
+    // Inicializar buffer de saída para capturar stdout/stderr completo
+    this.outputBuffers.set(name, { stdout: [], stderr: [] })
 
 
     this.emit(
@@ -171,6 +178,11 @@ export class ProcessManager extends EventEmitter {
         'data',
         (data: Buffer) => {
           const output = data.toString()
+          // Buffer completo para debug de falhas
+          const buffer = this.outputBuffers.get(name)
+          if (buffer) {
+            buffer.stdout.push(output)
+          }
           console.log('[ProcessManager] [Pipeline] stdout DATA', { name, outputPreview: output.slice(0, 200) })
           this.emit(
             'process-output',
@@ -185,6 +197,11 @@ export class ProcessManager extends EventEmitter {
         'data',
         (data: Buffer) => {
           const output = data.toString()
+          // Buffer completo para debug de falhas
+          const buffer = this.outputBuffers.get(name)
+          if (buffer) {
+            buffer.stderr.push(output)
+          }
           console.warn('[ProcessManager] [Pipeline] stderr DATA', { name, outputPreview: output.slice(0, 200) })
           this.emit(
             'process-output',
@@ -484,6 +501,26 @@ export class ProcessManager extends EventEmitter {
     info.status = code === 0
       ? 'stopped'
       : 'error'
+
+    // Se o processo terminou com erro (código não-zero), logar stdout/stderr completos para debug
+    if (code !== 0) {
+      const buffer = this.outputBuffers.get(name)
+      if (buffer) {
+        const fullStdout = buffer.stdout.join('')
+        const fullStderr = buffer.stderr.join('')
+        console.error('[ProcessManager] [Pipeline] PROCESS EXIT WITH ERROR - FULL LOGS', {
+          name,
+          code,
+          stdoutLength: fullStdout.length,
+          stderrLength: fullStderr.length,
+          stdout: fullStdout || '(empty)',
+          stderr: fullStderr || '(empty)'
+        })
+      }
+    } else {
+      // Limpar buffer em saída limpa
+      this.outputBuffers.delete(name)
+    }
 
 
     this.emit(

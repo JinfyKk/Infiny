@@ -305,9 +305,15 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                             isActive && 'bg-primary/10 text-primary border-l-2 border-primary',
                             !isActive && 'text-textSecondary',
                           )}
-                          onClick={() => {
+                          onClick={async () => {
                             setCurrentProject(project)
                             setExpandedProject(isExpanded ? null : project.id)
+                            // Persistir seleção do projeto no main process (atualiza lastOpened e lastProject)
+                            try {
+                              await window.electronAPI?.loadProject(project.name)
+                            } catch (err) {
+                              console.warn('[Sidebar] Falha ao persistir seleção do projeto:', err)
+                            }
                           }}
                           onContextMenu={(e) => {
                             e.preventDefault()
