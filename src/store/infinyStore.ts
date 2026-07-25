@@ -8,6 +8,15 @@ export interface Project {
   lastOpened: number
 }
 
+export interface MainProjectConfig {
+  path: string
+  name: string
+  lastOpened: number
+  history: ChatMessage[]
+  summary: string
+  importantInfo: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -97,6 +106,9 @@ interface InfinyState {
   // Internal: Electron event handlers
   _setupElectronListeners: () => void
   _cleanupElectronListeners: () => void
+
+  // Load chats from main process for a project
+  loadChatsForProject: (projectId: string, projectPath: string) => Promise<void>
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -170,6 +182,10 @@ export const useStore = create<InfinyState>()(
 
       setCurrentProject: (project) => {
         set({ currentProject: project })
+        if (project) {
+          // Load chats from main process for this project
+          get().loadChatsForProject(project.id, project.path)
+        }
       },
 
       addChat: (chat) => {
@@ -247,6 +263,12 @@ export const useStore = create<InfinyState>()(
 
       updateSettings: (settings) => {
         set((state) => ({ settings: { ...state.settings, ...settings } }))
+        // Sync to main process so provider restarts use the updated config
+        if (window.electronAPI?.saveProviderConfig) {
+          window.electronAPI.saveProviderConfig(settings).catch((err) => {
+            console.error('[infinyStore] Failed to sync settings to main:', err)
+          })
+        }
       },
 
       setProviderRunning: (running) => {
@@ -423,6 +445,61 @@ export const useStore = create<InfinyState>()(
 
       completeOnboarding: () => {
         set((state) => ({ settings: { ...state.settings, hasCompletedOnboarding: true } }))
+      },
+
+      loadChatsForProject: async (projectId: string, projectPath: string) => {
+        try {
+          // Load project from main process (includes chat history)
+          const projectData = await window.electronAPI?.loadProject(projectPath.split(/[\\/]/).pop() || '')
+          if (!projectData) {
+            console.log('[Store] No project data found for:', projectPath)
+            return
+          }
+
+          // Convert main process project history to chats
+          // The main process stores all messages in project.history as a flat array
+          // We need to group them into chats based on some logic, or just use the first chat
+          // For now, let's check if there are existing chats for this project in local store
+          const existingChats = get().chats.filter((c) => c.projectId === projectId)
+          if (existingChats.length > 0) {
+            console.log('[Store] Using existing', existingChats.length, 'chats for project:', projectId)
+            // If we have a currentChat but it's not from this project, switch to first chat
+            const currentChat = get().currentChat
+            if (!currentChat || currentChat.projectId !== projectId) {
+              get().setCurrentChat(existingChats[0])
+            }
+            return
+          }
+
+          // If no local chats, create a chat from the project history
+          if (projectData.history && projectData.history.length > 0) {
+            console.log('[Store] Creating chat from project history:', projectData.history.length, 'messages')
+            const chatMessages: ChatMessage[] = projectData.history.map((m) => ({
+              id: generateId(),
+              role: m.role,
+              content: m.content,
+              images: m.images,
+              timestamp: m.timestamp,
+              isStreaming: false,
+            }))
+
+            const newChat: Chat = {
+              id: generateId(),
+              projectId,
+              title: projectData.summary || 'Continuação do chat',
+              messages: chatMessages,
+              createdAt: projectData.lastOpened || Date.now(),
+              updatedAt: Date.now(),
+              summary: projectData.summary,
+              importantInfo: projectData.importantInfo,
+            }
+
+            set((state) => ({ chats: [...state.chats, newChat], currentChat: newChat }))
+            get().setCurrentChat(newChat)
+          }
+        } catch (error) {
+          console.error('[Store] Failed to load chats for project:', error)
+        }
       },
 
       _setupElectronListeners: () => {

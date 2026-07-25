@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { type ThemeName, defaultTheme } from './themes'
-import { applyThemeToDOM as applyDSTheme } from '@/design-system/themes'
+import { type ThemeName, defaultTheme, applyThemeToDOM } from './themes'
+import { useStore } from '@/store/infinyStore'
 
 interface ThemeContextValue {
   theme: ThemeName
@@ -11,45 +11,41 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { settings, updateSettings } = useStore()
   const [theme, setThemeState] = useState<ThemeName>(defaultTheme)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    // Read persisted theme from localStorage
+    // Read persisted theme from localStorage (zustand persist)
     const stored = localStorage.getItem('infiny-storage')
+    let savedTheme: ThemeName | null = null
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        const savedTheme = parsed.state?.settings?.theme
-        if (savedTheme) {
-          setThemeState(savedTheme)
-          applyDSTheme(savedTheme)
-        } else {
-          applyDSTheme(defaultTheme)
-        }
-      } catch {
-        applyDSTheme(defaultTheme)
-      }
-    } else {
-      applyDSTheme(defaultTheme)
-    }
-  }, [])
-
-  const setTheme = (newTheme: ThemeName) => {
-    setThemeState(newTheme)
-    applyDSTheme(newTheme)
-    // Persist to localStorage
-    const stored = localStorage.getItem('infiny-storage')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        parsed.state = parsed.state || {}
-        parsed.state.settings = parsed.state.settings || {}
-        parsed.state.settings.theme = newTheme
-        localStorage.setItem('infiny-storage', JSON.stringify(parsed))
+        savedTheme = parsed.state?.settings?.theme ?? null
       } catch {
         // ignore
       }
     }
+    const initialTheme = savedTheme ?? defaultTheme
+    setThemeState(initialTheme)
+    applyThemeToDOM(initialTheme)
+    setHydrated(true)
+  }, [])
+
+  // Sync with store when settings change
+  useEffect(() => {
+    if (hydrated && settings.theme !== theme) {
+      setThemeState(settings.theme)
+      applyThemeToDOM(settings.theme)
+    }
+  }, [settings.theme, hydrated])
+
+  const setTheme = (newTheme: ThemeName) => {
+    setThemeState(newTheme)
+    applyThemeToDOM(newTheme)
+    // Persist to store (which persists to localStorage via zustand middleware)
+    updateSettings({ theme: newTheme })
   }
 
   // During hydration, provide default theme to avoid mismatch
