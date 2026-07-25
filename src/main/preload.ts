@@ -1,686 +1,135 @@
-import { EventEmitter } from 'events'
-import { spawn, ChildProcess, SpawnOptions } from 'child_process'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import type { ProviderConfig } from '../providers/Provider'
 
-export interface ProcessInfo {
+/**
+ * Preload script — a ÚNICA ponte segura entre o processo main (Node/Electron)
+ * e o renderer (React, sandboxed, sem acesso direto a Node).
+ *
+ * Tudo que o renderer chama via `window.electronAPI.*` precisa estar
+ * exposto aqui via contextBridge.exposeInMainWorld, espelhando 1:1 os
+ * canais registrados com ipcMain.handle()/ipcMain.on() em src/main/main.ts.
+ *
+ * IMPORTANTE: este arquivo NÃO deve conter lógica de negócio (isso é
+ * responsabilidade do ProcessManager / Provider / main.ts). Ele existe só
+ * para repassar chamadas IPC de forma tipada e segura.
+ */
+
+// ============================================
+// TIPOS
+// ============================================
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  images?: string[]
+  timestamp: number
+}
+
+interface ProjectConfig {
+  path: string
   name: string
-  process: ChildProcess
-  command: string
-  args: string[]
-  options: SpawnOptions
-  startedAt: number
-  status: 'starting' | 'running' | 'stopped' | 'error'
+  lastOpened: number
+  history: ChatMessage[]
+  summary: string
+  importantInfo: string
+}
+
+interface ProcessStatusEntry {
+  processName: string
+  status: string
+  details?: string
+}
+
+interface ProcessStatusSnapshot {
+  processes: ProcessStatusEntry[]
+  providerHealthy: boolean
+  providerReady: boolean
+}
+
+interface StartProviderResult {
+  success: boolean
   error?: string
 }
 
-export interface HealthCheckConfig {
-  intervalMs: number
-  check: () => Promise<boolean>
-  onFailure?: (processName: string) => void
+// ============================================
+// HELPER: cria um listener de evento IPC que retorna sua própria função de cleanup
+// ============================================
+
+function createListener<T = unknown>(channel: string) {
+  return (callback: (data: T) => void) => {
+    const listener = (_event: IpcRendererEvent, data: T) => callback(data)
+    ipcRenderer.on(channel, listener)
+    return () => {
+      ipcRenderer.removeListener(channel, listener)
+    }
+  }
 }
 
-export interface ProcessManagerEvents {
-  'process-started': [info: ProcessInfo]
-  'process-stopped': [info: ProcessInfo, code: number | null]
-  'process-error': [info: ProcessInfo, error: Error]
-  'process-output': [processName: string, output: string]
-  'process-restarting': [processName: string, attempt: number]
-  'status-changed': [
-    processName: string,
-    status: ProcessInfo['status'],
-    details?: string
-  ]
+// ============================================
+// API EXPOSTA AO RENDERER
+// ============================================
+
+const electronAPI = {
+  // ---------- Projetos ----------
+  getProjects: (): Promise<ProjectConfig[]> => ipcRenderer.invoke('get-projects'),
+  createProject: (name: string, path: string): Promise<ProjectConfig> =>
+    ipcRenderer.invoke('create-project', name, path),
+  selectFolder: (): Promise<string | undefined> => ipcRenderer.invoke('select-folder'),
+  loadProject: (name: string): Promise<ProjectConfig | null> => ipcRenderer.invoke('load-project', name),
+  saveProject: (project: ProjectConfig): Promise<void> => ipcRenderer.invoke('save-project', project),
+  deleteProject: (name: string): Promise<void> => ipcRenderer.invoke('delete-project', name),
+
+  // ---------- Provider / Processos ----------
+  getProcessStatusSnapshot: (): Promise<ProcessStatusSnapshot> =>
+    ipcRenderer.invoke('get-process-status-snapshot'),
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>): Promise<StartProviderResult> =>
+    ipcRenderer.invoke('start-provider', projectPath, config),
+  sendToProvider: (chatId: string, message: string, images?: string[]): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('send-to-provider', chatId, message, images),
+  stopProvider: (): Promise<{ success: boolean }> => ipcRenderer.invoke('stop-provider'),
+  restartProvider: (): Promise<StartProviderResult> => ipcRenderer.invoke('restart-provider'),
+  getProviderConfig: (): Promise<{ providerId: string; config: ProviderConfig }> =>
+    ipcRenderer.invoke('get-provider-config'),
+  saveProviderConfig: (config: Partial<ProviderConfig>): Promise<void> =>
+    ipcRenderer.invoke('save-provider-config', config),
+  getAvailableProviders: (): Promise<unknown> => ipcRenderer.invoke('get-available-providers'),
+  getAvailableModels: (): Promise<unknown[]> => ipcRenderer.invoke('get-provider-models'),
+  setActiveProvider: (providerId: string, config?: Partial<ProviderConfig>): Promise<StartProviderResult> =>
+    ipcRenderer.invoke('set-active-provider', providerId, config),
+
+  // ---------- Arquivos ----------
+  openFile: (path: string): Promise<void> => ipcRenderer.invoke('open-file', path),
+  getFileInfo: (path: string): Promise<{ name?: string; size: number; modified: Date } | null> =>
+    ipcRenderer.invoke('get-file-info', path),
+  readFile: (path: string): Promise<{ success: boolean; content?: string; error?: string }> =>
+    ipcRenderer.invoke('read-file', path),
+  writeFile: (path: string, content: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('write-file', path, content),
+  listFiles: (dirPath: string): Promise<unknown[]> => ipcRenderer.invoke('list-files', dirPath),
+
+  // ---------- Controles de janela ----------
+  windowMinimize: (): void => ipcRenderer.send('window-minimize'),
+  windowMaximize: (): void => ipcRenderer.send('window-maximize'),
+  windowClose: (): void => ipcRenderer.send('window-close'),
+
+  // ---------- Eventos do Provider (stream de output do Claude CLI) ----------
+  onProviderOutput: createListener<string>('provider-output'),
+  onProviderError: createListener<string>('provider-error'),
+  onProviderExit: createListener<number>('provider-exit'),
+  onProviderReady: createListener<{ providerId: string }>('provider-ready'),
+  onProviderHealthy: createListener<Record<string, never>>('provider-healthy'),
+  onProviderStarted: createListener<{ providerId: string }>('provider-started'),
+  onProviderStopped: createListener<{ providerId: string }>('provider-stopped'),
+
+  // ---------- Eventos de processos (fcc-server / claude) ----------
+  onProcessStatus: createListener<{ processName: string; status: string; details?: string }>('process-status'),
+  onProcessError: createListener<{ name: string; error: string }>('process-error'),
+  onProcessStopped: createListener<{ name: string; code: number | null }>('process-stopped'),
+  onProcessRestarting: createListener<{ processName: string; attempt: number }>('process-restarting'),
+  onProcessStarted: createListener<{ name: string; command: string; args: string[] }>('process-started'),
+  onProcessOutput: createListener<{ processName: string; output: string }>('process-output'),
 }
 
-interface RestartPolicy {
-  maxRetries: number
-  delayMs: number
-  attempts: number
-}
+export type ElectronAPI = typeof electronAPI
 
-interface SpawnParams {
-  command: string
-  args: string[]
-  options: SpawnOptions
-  healthCheck?: HealthCheckConfig
-}
-
-/**
- * Gerenciador genérico de processos.
- *
- * NÃO conhece providers.
- * NÃO conhece Claude.
- * NÃO conhece fcc-server.
- *
- * Apenas gerencia processos filhos.
- */
-export class ProcessManager extends EventEmitter {
-  private processes = new Map<string, ProcessInfo>()
-
-  private healthChecks = new Map<
-    string,
-    {
-      timer: NodeJS.Timeout
-      config: HealthCheckConfig
-    }
-  >()
-
-  // Guarda os últimos parâmetros usados no spawn() de cada processo,
-  // para permitir restart() sem que o chamador precise repassar tudo de novo.
-  private spawnParams = new Map<string, SpawnParams>()
-
-  // Política de auto-restart configurada via configureRestart().
-  private restartPolicies = new Map<string, RestartPolicy>()
-
-  // Nomes de processos que foram parados intencionalmente via stop(),
-  // para não disparar auto-restart nesses casos.
-  private intentionalStops = new Set<string>()
-
-  async spawn(
-    name: string,
-    command: string,
-    args: string[],
-    options: SpawnOptions = {},
-    healthCheck?: HealthCheckConfig
-  ): Promise<ChildProcess> {
-
-    console.log(
-      '[ProcessManager] spawn:',
-      name,
-      command,
-      args.join(' ')
-    )
-
-
-    if (this.processes.has(name)) {
-      await this.stop(name)
-    }
-
-    // Guarda os parâmetros para permitir restart() futuramente.
-    this.spawnParams.set(name, { command, args, options, healthCheck })
-    this.intentionalStops.delete(name)
-
-
-    const info: ProcessInfo = {
-      name,
-      process: null as any,
-      command,
-      args,
-      options,
-      startedAt: Date.now(),
-      status: 'starting'
-    }
-
-
-    this.processes.set(name, info)
-
-
-    this.emit(
-      'status-changed',
-      name,
-      'starting',
-      `Iniciando ${command}`
-    )
-
-
-    return new Promise((resolve, reject) => {
-
-      let spawned = false
-
-
-      const child = spawn(command, args, {
-        ...options,
-        windowsHide: options.windowsHide ?? true
-      })
-
-
-      info.process = child
-
-
-      /*
-       * IMPORTANTE:
-       * spawn() retornar não significa que iniciou.
-       *
-       * O evento "spawn" confirma que o processo realmente nasceu.
-       */
-      child.once('spawn', () => {
-
-        spawned = true
-
-        info.status = 'running'
-
-
-        this.emit(
-          'status-changed',
-          name,
-          'running',
-          'Processo iniciado'
-        )
-
-
-        this.emit(
-          'process-started',
-          info
-        )
-
-
-        resolve(child)
-      })
-
-
-      child.stdout?.on(
-        'data',
-        (data: Buffer) => {
-          const output = data.toString()
-          console.log('[ProcessManager] [Pipeline] stdout DATA', { name, outputPreview: output.slice(0, 200) })
-          this.emit(
-            'process-output',
-            name,
-            output
-          )
-        }
-      )
-
-
-      child.stderr?.on(
-        'data',
-        (data: Buffer) => {
-          const output = data.toString()
-          console.warn('[ProcessManager] [Pipeline] stderr DATA', { name, outputPreview: output.slice(0, 200) })
-          this.emit(
-            'process-output',
-            name,
-            output
-          )
-        }
-      )
-
-
-      child.on(
-        'error',
-        (err: NodeJS.ErrnoException) => {
-
-          console.error(
-            '[ProcessManager] spawn error:',
-            err.code,
-            err.message
-          )
-
-
-          info.status = 'error'
-          info.error = err.message
-
-
-          this.emit(
-            'process-error',
-            info,
-            err
-          )
-
-
-          this.emit(
-            'status-changed',
-            name,
-            'error',
-            err.message
-          )
-
-
-          const fatalErrors = [
-            'ENOENT',
-            'EACCES',
-            'ENOEXEC'
-          ]
-
-
-          if (
-            err.code &&
-            fatalErrors.includes(err.code)
-          ) {
-
-            this.handleFatalSpawnError(
-              name,
-              err.message
-            )
-
-          } else {
-
-            this.handleProcessExit(
-              name,
-              -1
-            )
-
-          }
-
-
-          /*
-           * Se spawn falhou antes do processo existir,
-           * rejeita a Promise.
-           */
-          if (!spawned) {
-            reject(err)
-          }
-        }
-      )
-
-
-      child.on(
-        'close',
-        (code) => {
-
-          console.log(
-            '[ProcessManager] [Pipeline] PROCESS CLOSED',
-            name,
-            { code, signal: undefined }
-          )
-
-
-          this.handleProcessExit(
-            name,
-            code
-          )
-        }
-      )
-
-
-      if (healthCheck) {
-        this.setupHealthCheck(
-          name,
-          healthCheck
-        )
-      }
-
-    })
-  }
-
-
-  async stop(
-    name: string,
-    signal: NodeJS.Signals = 'SIGINT',
-    forceTimeoutMs = 3000
-  ): Promise<void> {
-
-    const info = this.processes.get(name)
-
-    if (!info || !info.process) {
-      return
-    }
-
-    // Marca como parada intencional para não disparar auto-restart.
-    this.intentionalStops.add(name)
-
-    this.clearHealthCheck(name)
-
-
-    const child = info.process
-
-
-    return new Promise(resolve => {
-
-      const timer = setTimeout(() => {
-
-        this.killProcessTree(child, 'SIGKILL')
-
-      }, forceTimeoutMs)
-
-
-      child.once(
-        'close',
-        code => {
-
-          clearTimeout(timer)
-
-          this.handleProcessExit(
-            name,
-            code
-          )
-
-          resolve()
-        }
-      )
-
-
-      this.killProcessTree(child, signal)
-
-    })
-  }
-
-  /**
-   * Mata um processo garantindo que a ÁRVORE inteira seja encerrada.
-   *
-   * IMPORTANTE (Windows): processos spawnados com `shell: true` (caso do
-   * fcc-server.exe e do claude.cmd neste projeto) rodam como filhos de um
-   * cmd.exe intermediário criado pelo Node. `child.kill()` nessa situação
-   * mata apenas esse cmd.exe — o processo real (fcc-server.exe, o node por
-   * trás do claude.cmd) continua rodando, órfão, ainda segurando a porta.
-   * Isso faz a próxima inicialização falhar com "endereço já em uso"
-   * (EADDRINUSE / WinError 10048), e o health check da inicialização nova
-   * acaba respondendo pelo processo órfão antigo, mascarando o problema até
-   * ele cair sozinho e derrubar o Claude CLI junto.
-   *
-   * `taskkill /pid <pid> /t /f` mata o processo E toda a sua árvore de
-   * filhos, resolvendo isso de vez.
-   */
-  private killProcessTree(
-    child: ChildProcess,
-    signal: NodeJS.Signals
-  ): void {
-
-    if (child.killed || !child.pid) {
-      return
-    }
-
-    if (process.platform === 'win32') {
-      spawn(
-        'taskkill',
-        ['/pid', String(child.pid), '/t', '/f'],
-        { windowsHide: true }
-      )
-    } else {
-      child.kill(signal)
-    }
-  }
-
-  /**
-   * Verifica se um processo está rodando no momento.
-   */
-  isRunning(name: string): boolean {
-    const info = this.processes.get(name)
-    return !!info && info.status === 'running'
-  }
-
-  /**
-   * Escreve dados no stdin de um processo (ex.: enviar mensagem NDJSON pro Claude CLI).
-   * Retorna false se o processo não existir, não estiver rodando, ou o stdin não for gravável.
-   */
-  writeToProcess(name: string, data: string): boolean {
-    const info = this.processes.get(name)
-
-    console.log('[ProcessManager] [Pipeline] writeToProcess CALLED', {
-      name,
-      dataLength: data.length,
-      hasInfo: !!info,
-      processExists: !!info?.process,
-      processStatus: info?.status,
-      stdinExists: !!info?.process?.stdin,
-      stdinWritable: !!info?.process?.stdin?.writable
-    })
-
-    if (!info || !info.process || info.status !== 'running') {
-      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: Process not running', {
-        name,
-        hasInfo: !!info,
-        processExists: !!info?.process,
-        status: info?.status
-      })
-      return false
-    }
-
-    const stdin = info.process.stdin
-
-    if (!stdin || !stdin.writable) {
-      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: stdin not writable', {
-        name,
-        stdinExists: !!stdin,
-        stdinWritable: !!stdin?.writable
-      })
-      return false
-    }
-
-    try {
-      const bytesWritten = Buffer.byteLength(data, 'utf8')
-      const success = stdin.write(data)
-      console.log('[ProcessManager] [Pipeline] writeToProcess SUCCESS', {
-        name,
-        bytesWritten,
-        success
-      })
-      return success
-    } catch (error) {
-      console.error('[ProcessManager] [Pipeline] writeToProcess ERROR', {
-        name,
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return false
-    }
-  }
-
-  /**
-   * Reinicia um processo usando os mesmos parâmetros do último spawn().
-   * Usado tanto manualmente (ex.: health check onFailure) quanto pela
-   * política de auto-restart configurada via configureRestart().
-   */
-  async restart(name: string): Promise<void> {
-    const params = this.spawnParams.get(name)
-
-    if (!params) {
-      throw new Error(
-        `[ProcessManager] restart() falhou: nenhum spawn anterior encontrado para "${name}"`
-      )
-    }
-
-    if (this.isRunning(name)) {
-      await this.stop(name)
-    }
-
-    await this.spawn(
-      name,
-      params.command,
-      params.args,
-      params.options,
-      params.healthCheck
-    )
-  }
-
-  /**
-   * Configura a política de auto-restart para um processo: quantas vezes
-   * tentar reiniciar automaticamente após uma queda inesperada, e o
-   * intervalo base entre tentativas (com backoff linear por tentativa).
-   */
-  configureRestart(name: string, maxRetries: number, delayMs: number): void {
-    this.restartPolicies.set(name, {
-      maxRetries,
-      delayMs,
-      attempts: 0
-    })
-  }
-
-
-  private handleProcessExit(
-    name: string,
-    code: number | null
-  ) {
-    const info = this.processes.get(name)
-
-    if (!info) {
-      return
-    }
-
-
-    info.status = code === 0
-      ? 'stopped'
-      : 'error'
-
-
-    this.emit(
-      'process-stopped',
-      info,
-      code
-    )
-
-
-    this.emit(
-      'status-changed',
-      name,
-      info.status,
-      `Processo encerrado (${code})`
-    )
-
-
-    this.clearHealthCheck(name)
-
-    this.maybeAutoRestart(name, code)
-  }
-
-  /**
-   * Se houver uma política de restart configurada para o processo e a
-   * queda não foi de um stop() intencional, agenda uma tentativa de
-   * restart automático (com backoff linear), respeitando maxRetries.
-   */
-  private maybeAutoRestart(name: string, code: number | null) {
-    const wasIntentional = this.intentionalStops.has(name)
-    this.intentionalStops.delete(name)
-
-    if (wasIntentional || code === 0) {
-      // Parada intencional ou saída limpa: não reinicia automaticamente.
-      const policy = this.restartPolicies.get(name)
-      if (policy) {
-        policy.attempts = 0
-      }
-      return
-    }
-
-    const policy = this.restartPolicies.get(name)
-
-    if (!policy) {
-      return
-    }
-
-    if (policy.attempts >= policy.maxRetries) {
-      console.warn(
-        `[ProcessManager] "${name}" excedeu o número máximo de restarts (${policy.maxRetries})`
-      )
-      return
-    }
-
-    policy.attempts += 1
-    const attempt = policy.attempts
-    const delay = policy.delayMs * attempt
-
-    this.emit('process-restarting', name, attempt)
-
-    setTimeout(() => {
-      this.restart(name).catch((error) => {
-        console.error(
-          `[ProcessManager] auto-restart falhou para "${name}":`,
-          error
-        )
-      })
-    }, delay)
-  }
-
-
-  private setupHealthCheck(
-    name: string,
-    config: HealthCheckConfig
-  ) {
-    this.clearHealthCheck(name)
-
-
-    const timer = setInterval(
-      async () => {
-        try {
-          const healthy = await config.check()
-
-          if (!healthy) {
-            console.warn(
-              `[ProcessManager] Health check falhou: ${name}`
-            )
-
-            config.onFailure?.(name)
-          }
-
-        } catch (error) {
-          console.error(
-            `[ProcessManager] Health check erro: ${name}`,
-            error
-          )
-        }
-      },
-      config.intervalMs
-    )
-
-
-    this.healthChecks.set(
-      name,
-      {
-        timer,
-        config
-      }
-    )
-  }
-
-
-  private clearHealthCheck(
-    name: string
-  ) {
-    const health = this.healthChecks.get(name)
-
-    if (!health) {
-      return
-    }
-
-
-    clearInterval(
-      health.timer
-    )
-
-    this.healthChecks.delete(name)
-  }
-
-
-  private handleFatalSpawnError(
-    name: string,
-    message: string
-  ) {
-    const info = this.processes.get(name)
-
-    if (!info) {
-      return
-    }
-
-
-    info.status = 'error'
-    info.error = message
-
-
-    this.emit(
-      'process-error',
-      info,
-      new Error(message)
-    )
-
-
-    this.emit(
-      'status-changed',
-      name,
-      'error',
-      message
-    )
-  }
-
-  /**
-   * Para todos os processos gerenciados graciosamente.
-   * Limpa health checks e aguarda encerramento.
-   * Seguro para chamar múltiplas vezes.
-   */
-  async shutdown(): Promise<void> {
-    console.log('[ProcessManager] Shutting down all processes...')
-
-    // Parar todos os health checks
-    for (const [, health] of this.healthChecks) {
-      clearInterval(health.timer)
-    }
-    this.healthChecks.clear()
-
-    // Parar todos os processos
-    const stopPromises = Array.from(this.processes.keys()).map(name => this.stop(name))
-    await Promise.all(stopPromises)
-
-    this.processes.clear()
-    this.spawnParams.clear()
-    this.restartPolicies.clear()
-    this.intentionalStops.clear()
-
-    console.log('[ProcessManager] Shutdown complete')
-  }
-}
+contextBridge.exposeInMainWorld('electronAPI', electronAPI)
