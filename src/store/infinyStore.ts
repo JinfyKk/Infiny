@@ -123,6 +123,7 @@ const DEFAULT_SETTINGS: Settings = {
 let outputCleanup: (() => void) | null = null
 let errorCleanup: (() => void) | null = null
 let exitCleanup: (() => void) | null = null
+let responseCompleteCleanup: (() => void) | null = null
 
 // BUG C (defesa em profundidade no renderer):
 // `isProviderRunning` só vira `true` DEPOIS que startProvider() resolve.
@@ -312,46 +313,43 @@ export const useStore = create<InfinyState>()(
 
         let assistantMessageId = ''
 
-        // Iniciar provider se não estiver rodando.
-        // Usa o mutex providerStartPromise (ver comentário no topo do arquivo)
-        // para garantir que chamadas concorrentes de sendToProvider aguardem
-        // a MESMA chamada startProvider em andamento, em vez de cada uma
-        // disparar a sua própria.
-        if (!state.isProviderRunning) {
-          let myStartPromise: Promise<void> | null = null
-          try {
-            if (!providerStartPromise) {
-              console.log('[Renderer] [Pipeline] sendToProvider - Starting provider for project:', currentProject.path)
-              myStartPromise = (async () => {
-                await window.electronAPI?.startProvider(
-                  currentProject.path,
-                  {
-                    model: settings.model,
-                    effort: settings.effort,
-                    webSearch: settings.webSearch,
-                  },
-                  'renderer:infinyStore.sendToProvider'
-                )
-                console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
-                // Aguardar um pouco para o provider iniciar
-                await new Promise((resolve) => setTimeout(resolve, 500))
-              })()
-              providerStartPromise = myStartPromise
-            } else {
-              console.log('[Renderer] [Pipeline] sendToProvider - reusing in-flight startProvider call')
-            }
+        // SEMPRE chamar startProvider com a config atual.
+        // O ProviderManager no main process tem lógica idempotente:
+        // só reinicia se provider, projectPath ou config (model/effort/webSearch) mudaram.
+        // Isso garante que mudanças de settings tenham efeito na próxima mensagem.
+        let myStartPromise: Promise<void> | null = null
+        try {
+          if (!providerStartPromise) {
+            console.log('[Renderer] [Pipeline] sendToProvider - Starting/ensuring provider for project:', currentProject.path, { model: settings.model, effort: settings.effort, webSearch: settings.webSearch })
+            myStartPromise = (async () => {
+              await window.electronAPI?.startProvider(
+                currentProject.path,
+                {
+                  model: settings.model,
+                  effort: settings.effort,
+                  webSearch: settings.webSearch,
+                },
+                'renderer:infinyStore.sendToProvider'
+              )
+              console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
+              // Aguardar um pouco para o provider iniciar
+              await new Promise((resolve) => setTimeout(resolve, 500))
+            })()
+            providerStartPromise = myStartPromise
+          } else {
+            console.log('[Renderer] [Pipeline] sendToProvider - reusing in-flight startProvider call')
+          }
 
-            await providerStartPromise
-          } catch (error) {
-            console.error('[Renderer] [Pipeline] sendToProvider - Error starting provider:', error)
-            return
-          } finally {
-            // Só limpa o mutex se ainda apontar para a promise que ESTA
-            // chamada criou (evita apagar a referência de uma chamada mais
-            // nova que possa ter sido criada nesse meio-tempo).
-            if (myStartPromise && providerStartPromise === myStartPromise) {
-              providerStartPromise = null
-            }
+          await providerStartPromise
+        } catch (error) {
+          console.error('[Renderer] [Pipeline] sendToProvider - Error starting provider:', error)
+          return
+        } finally {
+          // Só limpa o mutex se ainda apontar para a promise que ESTA
+          // chamada criou (evita apagar a referência de uma chamada mais
+          // nova que possa ter sido criada nesse meio-tempo).
+          if (myStartPromise && providerStartPromise === myStartPromise) {
+            providerStartPromise = null
           }
         }
 
@@ -450,9 +448,12 @@ export const useStore = create<InfinyState>()(
       loadChatsForProject: async (projectId: string, projectPath: string) => {
         try {
           // Load project from main process (includes chat history)
-          const projectData = await window.electronAPI?.loadProject(projectPath.split(/[\\/]/).pop() || '')
+          // Use project name from store, not path parsing
+          const project = get().projects.find((p) => p.id === projectId)
+          const projectName = project?.name || projectPath.split(/[\\/]/).pop() || ''
+          const projectData = await window.electronAPI?.loadProject(projectName)
           if (!projectData) {
-            console.log('[Store] No project data found for:', projectPath)
+            console.log('[Store] No project data found for:', projectName)
             return
           }
 
@@ -547,15 +548,35 @@ export const useStore = create<InfinyState>()(
             }
           }
         })
+
+        // Listener para fim de resposta (quando provider emite 'result' type)
+        responseCompleteCleanup = window.electronAPI?.onProviderResponseComplete(() => {
+          console.log('[Renderer] [Pipeline] onProviderResponseComplete RECEIVED')
+          set({ isProviderRunning: false })
+
+          // Finalizar mensagem de streaming
+          const currentChat = get().currentChat
+          if (currentChat) {
+            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              console.log('[Renderer] [Pipeline] onProviderResponseComplete - Finalizing streaming message')
+              get().updateMessage(currentChat.id, lastMessage.id, {
+                isStreaming: false,
+              })
+            }
+          }
+        })
       },
 
       _cleanupElectronListeners: () => {
         if (outputCleanup) outputCleanup()
         if (errorCleanup) errorCleanup()
         if (exitCleanup) exitCleanup()
+        if (responseCompleteCleanup) responseCompleteCleanup()
         outputCleanup = null
         errorCleanup = null
         exitCleanup = null
+        responseCompleteCleanup = null
       },
     }),
     {
@@ -575,12 +596,13 @@ function generateId(): string {
 }
 
 // Exportar constantes para uso em componentes
+// Estes modelos devem corresponder aos suportados pelo FreeClaudeProvider.getSupportedModels()
 export const MODELS = [
   'claude-fable-5',
-  'claude-opus-4-8',
+  'claude-opus-5',
   'claude-sonnet-5',
-  'claude-haiku-4-5-20251001',
-  'claude-haiku-4-5',
+  'claude-haiku-5',
+  'claude-haiku-4-5-20251001', // legacy
 ] as const
 
 export const EFFORTS = ['low', 'medium', 'high', 'max', 'xhigh', 'ultracode'] as const

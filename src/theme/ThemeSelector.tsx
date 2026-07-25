@@ -17,6 +17,7 @@ import {
 export function ThemeSelector() {
   const { theme, setTheme, availableThemes } = useTheme()
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [hoveredTheme, setHoveredTheme] = useState<ThemeName | null>(null)
   const shouldReduceMotion = useReducedMotion()
@@ -28,6 +29,8 @@ export function ThemeSelector() {
       if (
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
         !event.composedPath().includes(triggerRef.current)
       ) {
         setIsOpen(false)
@@ -65,6 +68,7 @@ export function ThemeSelector() {
 
   const portalContent = isOpen ? (
     <motion.div
+      ref={dropdownRef}
       variants={dropdownVariants}
       initial="hidden"
       animate="visible"

@@ -120,6 +120,7 @@ const electronAPI = {
   onProviderHealthy: createListener<Record<string, never>>('provider-healthy'),
   onProviderStarted: createListener<{ providerId: string }>('provider-started'),
   onProviderStopped: createListener<{ providerId: string }>('provider-stopped'),
+  onProviderResponseComplete: createListener<Record<string, never>>('provider-response-complete'),
 
   // ---------- Eventos de processos (fcc-server / claude) ----------
   onProcessStatus: createListener<{ processName: string; status: string; details?: string }>('process-status'),

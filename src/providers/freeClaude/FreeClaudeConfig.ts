@@ -88,21 +88,22 @@ export interface ModelOption {
  */
 export const ANTHROPIC_MODEL_ALIASES: Record<string, string[]> = {
   'claude-fable-5': ['fable-5', 'fable'],
-  'claude-opus-4-8': ['opus-4-8', 'opus'],
+  'claude-opus-5': ['opus-5', 'opus'],
   'claude-sonnet-5': ['sonnet-5', 'sonnet'],
+  'claude-haiku-5': ['haiku-5', 'haiku'],
   'claude-haiku-4-5-20251001': ['haiku-4-5', 'haiku'],
-  'claude-haiku-4-5': ['haiku'],
 }
 
 /**
- * Modelos suportados pela UI (nomes Anthropic puros).
+ * Modelos suportados pela UI (nomes Anthropic puros - compatíveis com Claude Code).
+ * Fonte: https://docs.anthropic.com/claude/docs/models-overview
  */
 export const SUPPORTED_ANTHROPIC_MODELS: string[] = [
   'claude-fable-5',
-  'claude-opus-4-8',
+  'claude-opus-5',
   'claude-sonnet-5',
+  'claude-haiku-5',
   'claude-haiku-4-5-20251001',
-  'claude-haiku-4-5',
 ]
 
 /**
@@ -110,11 +111,11 @@ export const SUPPORTED_ANTHROPIC_MODELS: string[] = [
  */
 export function getModelLabel(model: string): string {
   const labels: Record<string, string> = {
-    'claude-fable-5': 'Claude Fable 5 (Free)',
-    'claude-opus-4-8': 'Claude Opus 4.8 (Free)',
-    'claude-sonnet-5': 'Claude Sonnet 5 (Free)',
-    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5 (Free)',
-    'claude-haiku-4-5': 'Claude Haiku 4.5 (Free)',
+    'claude-fable-5': 'Claude Fable 5',
+    'claude-opus-5': 'Claude Opus 5',
+    'claude-sonnet-5': 'Claude Sonnet 5',
+    'claude-haiku-5': 'Claude Haiku 5',
+    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5 (Legado)',
   }
   return labels[model] ?? model
 }
@@ -125,10 +126,10 @@ export function getModelLabel(model: string): string {
 export function getModelDescription(model: string): string {
   const descriptions: Record<string, string> = {
     'claude-fable-5': 'Mais avançado — raciocínio complexo',
-    'claude-opus-4-8': 'Alta complexidade — análise profunda',
+    'claude-opus-5': 'Alta complexidade — análise profunda',
     'claude-sonnet-5': 'Equilibrado — uso geral',
-    'claude-haiku-4-5-20251001': 'Rápido e eficiente',
-    'claude-haiku-4-5': 'Rápido e eficiente',
+    'claude-haiku-5': 'Rápido e eficiente',
+    'claude-haiku-4-5-20251001': 'Rápido e eficiente (versão anterior)',
   }
   return descriptions[model] ?? 'Modelo personalizado'
 }

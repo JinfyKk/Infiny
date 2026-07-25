@@ -104,6 +104,13 @@ export interface AIProvider {
    * Retorna função de cleanup.
    */
   onReady(callback: () => void): () => void
+
+  /**
+   * Registra callback para quando uma resposta completa é recebida do provider.
+   * Útil para notificar que o streaming terminou.
+   * Retorna função de cleanup.
+   */
+  onResponseComplete(callback: () => void): () => void
 }
 
 /**
@@ -135,12 +142,14 @@ export class ProviderManager {
   private errorListeners: Set<(error: string) => void> = new Set()
   private exitListeners: Set<(code: number) => void> = new Set()
   private readyListeners: Set<() => void> = new Set()
+  private responseCompleteListeners: Set<() => void> = new Set()
 
   // Provider-specific listener cleanups
   private activeDataCleanup: (() => void) | null = null
   private activeErrorCleanup: (() => void) | null = null
   private activeExitCleanup: (() => void) | null = null
   private activeReadyCleanup: (() => void) | null = null
+  private activeResponseCompleteCleanup: (() => void) | null = null
 
   // ============================================
   // BUG C — serialização/idempotência de setActiveProvider
@@ -475,6 +484,15 @@ export class ProviderManager {
     return () => this.readyListeners.delete(callback)
   }
 
+  /**
+   * Registra listener global para quando uma resposta completa é recebida.
+   * Retorna função de cleanup.
+   */
+  onResponseComplete(callback: () => void): () => void {
+    this.responseCompleteListeners.add(callback)
+    return () => this.responseCompleteListeners.delete(callback)
+  }
+
   // ========== Internal ==========
 
   /**
@@ -502,6 +520,10 @@ export class ProviderManager {
     this.activeReadyCleanup = this.activeProvider.onReady?.(() => {
       this.readyListeners.forEach((cb) => cb())
     })
+
+    this.activeResponseCompleteCleanup = this.activeProvider.onResponseComplete?.(() => {
+      this.responseCompleteListeners.forEach((cb) => cb())
+    })
   }
 
   /**
@@ -523,6 +545,10 @@ export class ProviderManager {
     if (this.activeReadyCleanup) {
       this.activeReadyCleanup()
       this.activeReadyCleanup = null
+    }
+    if (this.activeResponseCompleteCleanup) {
+      this.activeResponseCompleteCleanup()
+      this.activeResponseCompleteCleanup = null
     }
   }
 }

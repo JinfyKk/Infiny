@@ -316,6 +316,15 @@ async function initializeActiveProvider(projectPath: string, source = 'unknown')
       })
     }
 
+    // 5. Escutar evento de resposta completa (específico do FreeClaudeProvider)
+    if (provider && 'onResponseComplete' in provider) {
+      console.log('[Main] [Pipeline] Registering onResponseComplete callback for FreeClaudeProvider')
+      ;(provider as any).onResponseComplete(() => {
+        console.log('[Main] [Pipeline] FreeClaudeProvider response complete, forwarding to renderer')
+        sendToRenderer('provider-response-complete', {})
+      })
+    }
+
     // 3. Agora sim, iniciar o provider já com o ProcessManager disponível
     console.log('[Main] [Pipeline] Calling setActiveProvider with config')
     await providerManager.setActiveProvider(activeProviderId, config, source)
@@ -563,8 +572,8 @@ ipcMain.handle('get-provider-models', async () => {
   // Para Free Claude, enriquecer com labels/descriptions
   if (providerId === 'free-claude') {
     const { getModelOptionsForProvider } = await import('../providers/freeClaude')
-    const freeProvider = (providerManager.getActiveProvider() as any)?.getFreeProvider?.() || 'openrouter'
-    return getModelOptionsForProvider(freeProvider)
+    // getModelOptionsForProvider não usa o parâmetro - retorna todos os modelos suportados
+    return getModelOptionsForProvider()
   }
 
   // Para outros providers, retornar formato básico

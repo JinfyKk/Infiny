@@ -5,16 +5,12 @@ import { useStore } from '@/store/infinyStore'
 import { Button } from '@/components/ui/Button'
 import { AnimatedTextarea } from '@/components/ui/AnimatedComponents'
 import { Message } from './Message'
-import { TypingIndicator } from './TypingIndicator'
 import { ModelSelector } from './ModelSelector'
 import { EffortSelector } from './EffortSelector'
 import { ProviderSelector } from './ProviderSelector'
 import { ThemeSelector } from '@/theme/ThemeSelector'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  typingIndicatorContainerVariants,
-  transitions,
-} from '@/lib/transitions'
+import { transitions } from '@/lib/transitions'
 import { StaggerContainer, StaggerItem } from '@/components/ui/AnimatedComponents'
 
 interface ChatAreaProps {
@@ -28,13 +24,11 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     currentProject,
     settings,
     isProviderRunning,
-    providerOutput,
     pendingImages,
     addMessage,
     updateSettings,
     sendToProvider,
     stopProvider,
-    clearProviderOutput,
     addPendingImage,
     removePendingImage,
     clearPendingImages,
@@ -65,7 +59,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentChat?.messages, isProviderRunning, providerOutput])
+  }, [currentChat?.messages, isProviderRunning])
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
@@ -92,7 +86,6 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     addMessage(currentChat!.id, userMessage)
 
     clearPendingImages()
-    clearProviderOutput()
     console.log('[ChatArea] [Pipeline] Calling sendToProvider')
     await sendToProvider(currentChat!.id, text, images)
     console.log('[ChatArea] [Pipeline] handleSend COMPLETED')
@@ -302,48 +295,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
           </AnimatePresence>
         </StaggerContainer>
 
-        {isProviderRunning && (
-          <motion.div
-            variants={typingIndicatorContainerVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            className="flex items-start gap-3"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={transitions.smooth}
-              className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5"
-            >
-              <Sparkles className="w-4 h-4 text-primary" />
-            </motion.div>
-            <div className="flex-1 max-w-[85%]">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={transitions.smooth}
-                className="bg-surfaceHover rounded-2xl rounded-bl-md p-4"
-              >
-                <TypingIndicator />
-              </motion.div>
-              {providerOutput && (
-                <motion.div
-                  initial={{ opacity: 0, scaleY: 0.8, y: -8 }}
-                  animate={{ opacity: 1, scaleY: 1, y: 0 }}
-                  exit={{ opacity: 0, scaleY: 0.8, y: -8 }}
-                  transition={transitions.smooth}
-                  className="mt-2 p-3 bg-surface/50 border border-border rounded-lg font-mono text-xs text-textSecondary max-h-40 overflow-y-auto transform-origin-top"
-                >
-                  {providerOutput.slice(-2000)}
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
         <div ref={messagesEndRef} />
-      </div>
 
       {/* Pending Images Preview */}
       {pendingImages.length > 0 && (
@@ -377,6 +329,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
           ))}
         </motion.div>
       )}
+
+      </div>
 
       {/* Input Area */}
       <motion.div

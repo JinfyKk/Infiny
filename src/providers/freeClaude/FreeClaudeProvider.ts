@@ -28,6 +28,7 @@ export class FreeClaudeProvider implements AIProvider {
   private exitCallback: ((code: number) => void) | null = null
   private readyCallback: (() => void) | null = null
   private healthyCallback: (() => void) | null = null
+  private responseCompleteCallback: (() => void) | null = null
 
   // Buffer para parsing NDJSON
   private messageBuffer = ''
@@ -58,10 +59,10 @@ export class FreeClaudeProvider implements AIProvider {
     // Nomes Anthropic puros - o fcc-server resolve internamente via MODEL_FABLE, MODEL_OPUS, etc.
     return [
       'claude-fable-5',
-      'claude-opus-4-8',
+      'claude-opus-5',
       'claude-sonnet-5',
+      'claude-haiku-5',
       'claude-haiku-4-5-20251001',
-      'claude-haiku-4-5',
     ]
   }
 
@@ -624,6 +625,13 @@ export class FreeClaudeProvider implements AIProvider {
     }
   }
 
+  onResponseComplete(callback: () => void): () => void {
+    this.responseCompleteCallback = callback
+    return () => {
+      this.responseCompleteCallback = null
+    }
+  }
+
   // ========== Parser NDJSON (reutilizado do ClaudeProvider) ==========
 
   /**
@@ -650,6 +658,7 @@ export class FreeClaudeProvider implements AIProvider {
       // Tipo: result - resultado final
       if (parsed.type === 'result' && parsed.result) {
         console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson RESULT', { textLength: parsed.result.length })
+        this.responseCompleteCallback?.()
         return { type: 'result', text: parsed.result }
       }
 

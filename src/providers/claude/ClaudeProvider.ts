@@ -206,6 +206,15 @@ export class ClaudeProvider implements AIProvider {
     }
   }
 
+  onResponseComplete(callback: () => void): () => void {
+    this.responseCompleteCallback = callback
+    return () => {
+      this.responseCompleteCallback = null
+    }
+  }
+
+  private responseCompleteCallback: (() => void) | null = null
+
   /**
    * Encontra o executável do Claude no Windows.
    */
@@ -295,6 +304,7 @@ export class ClaudeProvider implements AIProvider {
       }
 
       if (parsed.type === 'result' && parsed.result) {
+        this.responseCompleteCallback?.()
         return { type: 'result', text: parsed.result }
       }
 
