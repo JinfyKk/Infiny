@@ -459,14 +459,23 @@ export class FreeClaudeProvider implements AIProvider {
       command,
       args,
       options,
-      // Health check para claude CLI - apenas verificar se processo está vivo
+      // Health check para claude CLI - APENAS monitora/loga, não reinicia.
+      //
+      // NOTA (fix): antes, o onFailure aqui chamava pm.restart(name) direto,
+      // criando uma SEGUNDA via de auto-restart totalmente independente da
+      // do ProcessManager (configureRestart() + maybeAutoRestart(), logo
+      // abaixo). Essa segunda via não tinha nenhuma visibilidade sobre
+      // intentionalStops: se o processo estivesse parado de propósito (ex.:
+      // troca de projeto) bem no momento em que este intervalo de 10s
+      // ticasse, ela reiniciava o claude de qualquer jeito, sem checar o
+      // motivo. Como o ProcessManager já cuida disso corretamente via
+      // handleProcessExit()/maybeAutoRestart() (que respeita
+      // intentionalStops e tem sua própria política de maxRetries/backoff
+      // configurada logo abaixo por pm.configureRestart()), esse onFailure
+      // era redundante e um segundo ponto de restart fantasma. Removido.
       {
         intervalMs: 10_000,
         check: async () => pm.isRunning('claude'),
-        onFailure: (name) => {
-          console.warn(`[FreeClaudeProvider] [Pipeline] Process "${name}" stopped, restarting...`)
-          pm.restart(name)
-        },
       }
     )
     console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli pm.spawn() returned')

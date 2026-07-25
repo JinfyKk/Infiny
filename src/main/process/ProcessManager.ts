@@ -322,13 +322,33 @@ export class ProcessManager extends EventEmitter {
       return
     }
 
+    const child = info.process
+
+    // FIX (deadlock): o Map `this.processes` não é limpo quando um processo
+    // morre — só o `status` é atualizado (ver handleProcessExit). Isso faz
+    // com que, ao chamar spawn() de novo pro mesmo `name` (ex.: trocar de
+    // projeto), o `if (this.processes.has(name)) await this.stop(name)`
+    // encontre essa entrada obsoleta, cujo `child` já teve seu evento
+    // 'close' disparado uma única vez no passado. Um `child.once('close', ...)`
+    // registrado DEPOIS que 'close' já disparou nunca é chamado de novo —
+    // o evento não "replaya". Sem essa guarda, a Promise abaixo nunca
+    // resolvia (o fallback de timeout só reenvia taskkill, não dá resolve()),
+    // travando o await para sempre e nunca chegando nas linhas seguintes de
+    // spawn() (por isso o log sempre parava logo após "spawn: fcc-server").
+    // `exitCode`/`signalCode` só deixam de ser null depois que o processo
+    // já terminou de verdade — se qualquer um dos dois já estiver setado,
+    // não há nada pra esperar.
+    if (child.exitCode !== null || child.signalCode !== null) {
+      this.intentionalStops.delete(name)
+      return
+    }
+
     // Marca como parada intencional para não disparar auto-restart.
     this.intentionalStops.add(name)
 
     this.clearHealthCheck(name)
 
 
-    const child = info.process
     const pid = child.pid
 
 
