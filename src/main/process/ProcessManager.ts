@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { spawn, ChildProcess, SpawnOptions } from 'child_process'
+import { spawn, ChildProcess, SpawnOptions, exec } from 'child_process'
 
 export interface ProcessInfo {
   name: string
@@ -312,6 +312,7 @@ export class ProcessManager extends EventEmitter {
 
 
     const child = info.process
+    const pid = child.pid
 
 
     return new Promise(resolve => {
@@ -319,7 +320,16 @@ export class ProcessManager extends EventEmitter {
       const timer = setTimeout(() => {
 
         if (!child.killed) {
-          child.kill('SIGKILL')
+          if (process.platform === 'win32' && pid) {
+            // Fallback de força bruta: mata a árvore inteira de processos
+            // pelo PID. Cobre casos em que o processo (ou algum ancestral
+            // dele, ex.: um cmd.exe intermediário) não respondeu ao kill
+            // normal e ainda tem filhos vivos segurando recursos (ex.:
+            // uma porta TCP).
+            exec(`taskkill /PID ${pid} /T /F`)
+          } else {
+            child.kill('SIGKILL')
+          }
         }
 
       }, forceTimeoutMs)
@@ -341,7 +351,16 @@ export class ProcessManager extends EventEmitter {
       )
 
 
-       child.kill(signal)
+      if (process.platform === 'win32' && pid) {
+        // No Windows, sinais POSIX (SIGINT/SIGTERM) não existem de verdade.
+        // Usamos taskkill /T (árvore) /F (força) direto: isso garante que
+        // qualquer processo filho (ex.: quando o processo foi spawnado via
+        // shell:true e criou um cmd.exe intermediário) também é encerrado,
+        // e não fica órfão segurando portas/handles depois que o app fecha.
+        exec(`taskkill /PID ${pid} /T /F`)
+      } else {
+        child.kill(signal)
+      }
 
     })
   }

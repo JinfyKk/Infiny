@@ -42,6 +42,13 @@ const PROVIDER_API_KEY_ENV: Record<FreeClaudeProviderId, string | undefined> = {
 }
 
 /**
+ * Default gratuito provider usado quando não configurado pelo usuário.
+ * NVIDIA NIM é o provedor padrão documentado pelo free-claude-code (tem tier gratuito).
+ * Mantido como constante compartilhada para evitar mismatch entre start() e spawnFccServer().
+ */
+const DEFAULT_FREE_PROVIDER: FreeClaudeProviderId = 'nvidia'
+
+/**
  * Provider para Free Claude Code (via free-claude-code proxy).
  *
  * Arquitetura NOVA (ProcessManager genérico):
@@ -74,6 +81,9 @@ export class FreeClaudeProvider implements AIProvider {
   // Cleanup functions for ProcessManager listeners
   private pmCleanups: Array<() => void> = []
 
+  // Lock para evitar start/stop concorrentes
+  private _startStopLock = false
+
   constructor(_providerManager: ProviderManager) {
     console.log('[DEBUG] [FreeClaudeProvider] constructor called')
     // O providerManager não é mais usado diretamente
@@ -101,7 +111,10 @@ export class FreeClaudeProvider implements AIProvider {
   }
 
   getSupportedEfforts(): string[] {
-    return ['low']
+    // O Claude Code CLI oficial suporta: low, medium, high
+    // O free-claude-code proxy repassa --effort para a API.
+    // Alguns provedores podem não suportar todos os níveis.
+    return ['low', 'medium', 'high']
   }
 
   supportsWebSearch(): boolean {
@@ -117,72 +130,83 @@ export class FreeClaudeProvider implements AIProvider {
    * Spawna fcc-server e claude CLI via ProcessManager.
    */
   async start(config: ProviderConfig): Promise<void> {
-    console.log('[DEBUG] [FreeClaudeProvider] start() - START')
-    this.config = { ...config } as ProviderConfig & { freeProvider?: string }
-
-    console.log('[DEBUG] [FreeClaudeProvider] start() - config:', {
-      model: this.config.model,
-      freeProvider: this.config.freeProvider,
-      projectPath: this.config.projectPath,
-    })
-
-    this.messageBuffer = ''
-
-    // Se já rodando, parar primeiro
-    if (this.isRunning()) {
-      console.log('[DEBUG] [FreeClaudeProvider] start() - already running, stopping first')
-      await this.stop()
+    // Evitar start/stop concorrentes
+    if (this._startStopLock) {
+      console.warn('[FreeClaudeProvider] start() - already in progress, skipping')
+      return
     }
+    this._startStopLock = true
 
-    // 1. Resolver ID do modelo para o provedor gratuito
-    console.log('[DEBUG] [FreeClaudeProvider] start() - resolving model ID')
-    const { resolveModelId } = await import('./modelMapping')
-    // NOTA: 'nvidia' como padrão porque é o provedor padrão documentado pelo
-    // free-claude-code (NVIDIA NIM tem tier gratuito) e o que já está
-    // configurado com chave ativa. Isso é um valor temporário — o ideal é
-    // isso vir de uma tela de Configurações no Infiny (freeProvider + apiKey
-    // escolhidos pelo usuário), não hardcoded aqui.
-    const freeProvider = (this.config.freeProvider ?? 'nvidia') as FreeClaudeProviderId
-    this.resolvedModelId = resolveModelId(
-      this.config.model || 'claude-fable-5',
-      freeProvider,
-      this.config.modelMapping
-    )
-    console.log('[DEBUG] [FreeClaudeProvider] start() - model resolved:', this.config.model, '→', this.resolvedModelId)
+    try {
+      console.log('[DEBUG] [FreeClaudeProvider] start() - START')
+      this.config = { ...config } as ProviderConfig & { freeProvider?: string }
 
-    // 2. Checar ProcessManager (precisa já ter sido injetado pelo main.ts)
-    console.log('[DEBUG] [FreeClaudeProvider] start() - checking ProcessManager, has:', !!this.processManager)
-    if (!this.processManager) {
-      throw new Error('ProcessManager não injetado. Chame setProcessManagerRef antes de start().')
+      console.log('[DEBUG] [FreeClaudeProvider] start() - config:', {
+        model: this.config.model,
+        freeProvider: this.config.freeProvider,
+        projectPath: this.config.projectPath,
+      })
+
+      this.messageBuffer = ''
+
+      // Se já rodando, parar primeiro
+      if (this.isRunning()) {
+        console.log('[DEBUG] [FreeClaudeProvider] start() - already running, stopping first')
+        await this.stop()
+      }
+
+      // 1. Resolver ID do modelo para o provedor gratuito
+      console.log('[DEBUG] [FreeClaudeProvider] start() - resolving model ID')
+      const { resolveModelId } = await import('./modelMapping')
+      // NOTA: DEFAULT_FREE_PROVIDER como padrão porque é o provedor padrão documentado pelo
+      // free-claude-code (NVIDIA NIM tem tier gratuito) e o que já está
+      // configurado com chave ativa. Isso é um valor temporário — o ideal é
+      // isso vir de uma tela de Configurações no Infiny (freeProvider + apiKey
+      // escolhidos pelo usuário), não hardcoded aqui.
+      const freeProvider = (this.config.freeProvider ?? DEFAULT_FREE_PROVIDER) as FreeClaudeProviderId
+      this.resolvedModelId = resolveModelId(
+        this.config.model || 'claude-fable-5',
+        freeProvider,
+        this.config.modelMapping
+      )
+      console.log('[DEBUG] [FreeClaudeProvider] start() - model resolved:', this.config.model, '→', this.resolvedModelId)
+
+      // 2. Checar ProcessManager (precisa já ter sido injetado pelo main.ts)
+      console.log('[DEBUG] [FreeClaudeProvider] start() - checking ProcessManager, has:', !!this.processManager)
+      if (!this.processManager) {
+        throw new Error('ProcessManager não injetado. Chame setProcessManagerRef antes de start().')
+      }
+      console.log('[DEBUG] [FreeClaudeProvider] start() - ProcessManager OK')
+
+      // 3. Spawn fcc-server
+      console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnFccServer()')
+      await this.spawnFccServer()
+      console.log('[DEBUG] [FreeClaudeProvider] start() - spawnFccServer() completed')
+
+      // 4. Aguardar fcc-server ficar saudável
+      console.log('[DEBUG] [FreeClaudeProvider] start() - calling waitForServerHealthy()')
+      await this.waitForServerHealthy()
+      console.log('[DEBUG] [FreeClaudeProvider] start() - waitForServerHealthy() completed')
+
+      // 4.5. Emitir evento de servidor saudável
+      this.healthyCallback?.()
+
+      // 5. Spawn Claude CLI apontando para o proxy
+      console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnClaudeCli()')
+      await this.spawnClaudeCli()
+      console.log('[DEBUG] [FreeClaudeProvider] start() - spawnClaudeCli() completed')
+
+      // 6. Configurar listeners de output do ProcessManager
+      console.log('[DEBUG] [FreeClaudeProvider] start() - calling setupProcessManagerListeners()')
+      this.setupProcessManagerListeners()
+      console.log('[DEBUG] [FreeClaudeProvider] start() - END')
+
+      // 7. Emitir evento de provider pronto
+      console.log('[DEBUG] [FreeClaudeProvider] start() - emitting provider-ready event')
+      this.readyCallback?.()
+    } finally {
+      this._startStopLock = false
     }
-    console.log('[DEBUG] [FreeClaudeProvider] start() - ProcessManager OK')
-
-    // 3. Spawn fcc-server
-    console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnFccServer()')
-    await this.spawnFccServer()
-    console.log('[DEBUG] [FreeClaudeProvider] start() - spawnFccServer() completed')
-
-    // 4. Aguardar fcc-server ficar saudável
-    console.log('[DEBUG] [FreeClaudeProvider] start() - calling waitForServerHealthy()')
-    await this.waitForServerHealthy()
-    console.log('[DEBUG] [FreeClaudeProvider] start() - waitForServerHealthy() completed')
-
-    // 4.5. Emitir evento de servidor saudável
-    this.healthyCallback?.()
-
-    // 5. Spawn Claude CLI apontando para o proxy
-    console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnClaudeCli()')
-    await this.spawnClaudeCli()
-    console.log('[DEBUG] [FreeClaudeProvider] start() - spawnClaudeCli() completed')
-
-    // 6. Configurar listeners de output do ProcessManager
-    console.log('[DEBUG] [FreeClaudeProvider] start() - calling setupProcessManagerListeners()')
-    this.setupProcessManagerListeners()
-    console.log('[DEBUG] [FreeClaudeProvider] start() - END')
-
-    // 7. Emitir evento de provider pronto
-    console.log('[DEBUG] [FreeClaudeProvider] start() - emitting provider-ready event')
-    this.readyCallback?.()
   }
 
   /**
@@ -210,7 +234,7 @@ export class FreeClaudeProvider implements AIProvider {
     console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer START')
     const pm = this.processManager!
     const projectPath = this.config!.projectPath || process.cwd()
-    const freeProvider = (this.config!.freeProvider || 'openrouter') as FreeClaudeProviderId
+    const freeProvider = (this.config!.freeProvider ?? DEFAULT_FREE_PROVIDER) as FreeClaudeProviderId
     const apiKey = (this.config as any).apiKey
 
     // fcc-server NÃO aceita argumentos de configuração (--provider, --port, --host, etc.)
@@ -279,8 +303,16 @@ export class FreeClaudeProvider implements AIProvider {
         cwd: projectPath,
         env,
         windowsHide: true,
-        // Resolve .exe/.cmd/.bat via PATHEXT automaticamente no Windows
-        shell: process.platform === 'win32',
+        // IMPORTANTE: NÃO usar shell aqui. fccServerCmd já é o caminho
+        // absoluto do .exe (ver findFccServerExecutable()), então shell
+        // não é necessário para resolvê-lo. Com shell:true no Windows, o
+        // Node cria o fcc-server.exe como filho de um cmd.exe invisível;
+        // ao chamar child.kill() para parar o processo, apenas o cmd.exe
+        // morre e o fcc-server.exe (que já fez bind na porta 8082) fica
+        // órfão rodando em background. Na próxima abertura do app, o novo
+        // fcc-server não consegue mais subir na porta 8082 (WinError 10048)
+        // e o chat para de funcionar.
+        shell: false,
       },
       // Health check para fcc-server - APENAS monitora, NÃO reinicia
       // O waitForServerHealthy() faz o monitoramento ativo durante startup
@@ -717,28 +749,39 @@ export class FreeClaudeProvider implements AIProvider {
    * Para o provider graciosamente via ProcessManager.
    */
   async stop(): Promise<void> {
-    console.log('[FreeClaudeProvider] Stopping...')
+    // Evitar start/stop concorrentes
+    if (this._startStopLock) {
+      console.warn('[FreeClaudeProvider] stop() - already in progress, skipping')
+      return
+    }
+    this._startStopLock = true
 
     try {
-      if (this.processManager) {
-        // Parar claude primeiro
-        if (this.processManager.isRunning('claude')) {
-          await this.processManager.stop('claude')
-        }
-        // Parar fcc-server
-        if (this.processManager.isRunning('fcc-server')) {
-          await this.processManager.stop('fcc-server')
-        }
-      }
-    } catch (error) {
-      console.error('[FreeClaudeProvider] Error stopping:', error)
-    }
+      console.log('[FreeClaudeProvider] Stopping...')
 
-    this.cleanupProcessManagerListeners()
-    this.config = null
-    this.resolvedModelId = ''
-    this.messageBuffer = ''
-    console.log('[FreeClaudeProvider] Stopped')
+      try {
+        if (this.processManager) {
+          // Parar claude primeiro
+          if (this.processManager.isRunning('claude')) {
+            await this.processManager.stop('claude')
+          }
+          // Parar fcc-server
+          if (this.processManager.isRunning('fcc-server')) {
+            await this.processManager.stop('fcc-server')
+          }
+        }
+      } catch (error) {
+        console.error('[FreeClaudeProvider] Error stopping:', error)
+      }
+
+      this.cleanupProcessManagerListeners()
+      this.config = null
+      this.resolvedModelId = ''
+      this.messageBuffer = ''
+      console.log('[FreeClaudeProvider] Stopped')
+    } finally {
+      this._startStopLock = false
+    }
   }
 
   /**

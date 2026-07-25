@@ -101,7 +101,7 @@ interface InfinyState {
 
 const DEFAULT_SETTINGS: Settings = {
   model: 'claude-fable-5',
-  effort: 'high',
+  effort: 'low',
   webSearch: false,
   theme: 'pampas',
   provider: 'claude',

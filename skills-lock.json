@@ -1,11 +1,59 @@
 {
   "version": 1,
   "skills": {
+    "Python Backend Architecture Review": {
+      "source": "rknall/claude-skills",
+      "sourceType": "github",
+      "skillPath": "python-architecture-review/SKILL.md",
+      "computedHash": "c65bc3fbee8f23f6570d348249c4026e30bd623e0b037a39e54c5e611cfd9ae7"
+    },
+    "electron-dev": {
+      "source": "jamditis/claude-skills-journalism",
+      "sourceType": "github",
+      "skillPath": "dev-toolkit/skills/electron-dev/SKILL.md",
+      "computedHash": "21b73bc20015c4aa105512ced3d1dad6409105193c5e610e9f618fc13eff8f2a"
+    },
     "electron-development": {
       "source": "mindrally/skills",
       "sourceType": "github",
       "skillPath": "electron-development/SKILL.md",
       "computedHash": "70fd62ad484e35884485ae043d22f3ea7ff3e1365c536569c1994a4c211ba931"
+    },
+    "git-workflow-and-versioning": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-workflow-and-versioning/SKILL.md",
+      "computedHash": "8b53153892a21c3a486831bf608970b040ad0e9da698505af58c659242cf835c"
+    },
+    "logging-observability": {
+      "source": "wshaddix/dotnet-skills",
+      "sourceType": "github",
+      "skillPath": "skills/logging-observability/SKILL.md",
+      "computedHash": "5168096067b2921b5297fa044649734cd471490c0f855f37ea771541aa4dec3b"
+    },
+    "nodejs-core": {
+      "source": "mcollina/skills",
+      "sourceType": "github",
+      "skillPath": "skills/nodejs-core/SKILL.md",
+      "computedHash": "3ed20068dbef480f3be4dcd0ebd8b9ea136540b2ff9f62313033dc157911fe11"
+    },
+    "react-performance": {
+      "source": "oakoss/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-performance/SKILL.md",
+      "computedHash": "d822b17a5e570b72791b00130dd675ea2eb62565fc303f186d178bbe66e520d3"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "a2750dfbaed1690da73b120254892c4f926b4576cb82eb16fc877783941fe39b"
+    },
+    "typescript-react-reviewer": {
+      "source": "dotneet/claude-code-marketplace",
+      "sourceType": "github",
+      "skillPath": "review-tool/skills/typescript-react-reviewer/SKILL.md",
+      "computedHash": "21fa76f3823df89fbd4e299d03772aaaa5c1d67c586a8b9b51d1888431acd84a"
     }
   }
 }

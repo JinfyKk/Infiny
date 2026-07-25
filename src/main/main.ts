@@ -66,7 +66,7 @@ let providerReadyFired = false
 let activeProviderId = 'free-claude' // Default para free-claude (sem login)
 let activeProviderConfig: ProviderConfig = {
   model: 'claude-fable-5',
-  effort: 'high',
+  effort: 'low',
   webSearch: false,
   projectPath: '',
 }
