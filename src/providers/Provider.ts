@@ -142,6 +142,31 @@ export class ProviderManager {
   private activeExitCleanup: (() => void) | null = null
   private activeReadyCleanup: (() => void) | null = null
 
+  // ============================================
+  // BUG C — serialização/idempotência de setActiveProvider
+  // ============================================
+  //
+  // Antes desta correção, setActiveProvider() não tinha NENHUMA proteção
+  // contra chamadas concorrentes ou duplicadas: cada chamada disparava
+  // incondicionalmente stop() -> start(), mesmo se já houvesse uma
+  // ativação idêntica em andamento ou já concluída. Isso permitia que
+  // múltiplos caminhos (boot, IPC start-provider, IPC set-active-provider)
+  // disparassem vários ciclos stop/start seguidos para o mesmo projeto,
+  // e permitia que um stop() de uma chamada derrubasse um start() em
+  // andamento de outra.
+  //
+  // A correção tem duas partes:
+  // 1. Fila (_activationQueue): TODAS as chamadas de setActiveProvider são
+  //    encadeadas nesta fila, não importa a origem. Uma segunda chamada
+  //    que chegue enquanto a primeira ainda está no meio do stop()/start()
+  //    aguarda a primeira terminar antes de rodar — nunca roda em paralelo.
+  // 2. Idempotência (_setActiveProviderLocked): quando chega a vez de uma
+  //    chamada rodar, ela verifica se o provider requisitado já é o ativo,
+  //    para o MESMO projectPath, com a MESMA config relevante, e já está
+  //    rodando. Se sim, é tratada como no-op explícito (skip), sem stop/start.
+  private _activationQueue: Promise<void> = Promise.resolve()
+  private _activationSeq = 0
+
   /**
    * Registra uma factory de provider.
    * A factory recebe o manager para permitir comunicação bidirecional se necessário.
@@ -208,30 +233,110 @@ export class ProviderManager {
 
   /**
    * Define o provider ativo.
-   * Se houver provider ativo anterior, para ele.
+   * Se houver provider ativo anterior E a ativação não for idempotente, para ele.
    * Reusa instância cacheada se já existir (para preservar injeções como ProcessManager).
+   *
+   * SERIALIZADA: encadeada em _activationQueue, então nunca roda em paralelo
+   * com outra chamada de setActiveProvider (mesmo para providers/projetos diferentes).
+   *
+   * IDEMPOTENTE: se o provider requisitado já é o ativo, para o mesmo
+   * projectPath, com a mesma config relevante (model/effort/webSearch), e já
+   * está rodando, a chamada é um no-op explícito — não faz stop()/start() de novo.
+   *
+   * @param source Origem lógica da chamada (ex.: "ipc:start-provider",
+   *   "ipc:set-active-provider", "app:boot"), propagada explicitamente desde
+   *   quem chamou, para aparecer nos logs junto com o stack trace de origem.
    */
-  async setActiveProvider(id: string, config?: ProviderConfig): Promise<void> {
-    console.log('[DEBUG] [ProviderManager] setActiveProvider called for:', id)
+  async setActiveProvider(id: string, config?: ProviderConfig, source = 'unknown'): Promise<void> {
+    const callId = ++this._activationSeq
+    const originStack = new Error('setActiveProvider origin').stack
+
+    console.log('[DEBUG] [ProviderManager] setActiveProvider QUEUED', {
+      callId,
+      id,
+      projectPath: config?.projectPath,
+      source,
+      timestamp: new Date().toISOString(),
+    })
+    console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} origin stack:\n${originStack}`)
+
+    // Encadeia na fila de ativações. Usamos .catch() ao reatribuir a fila
+    // para que uma falha numa chamada NÃO "envenene" a fila inteira e trave
+    // todas as ativações futuras (a chamada original ainda rejeita normalmente
+    // para quem a await-ou, via `task` abaixo).
+    const task = this._activationQueue.then(() =>
+      this._setActiveProviderLocked(id, config, callId, source)
+    )
+    this._activationQueue = task.catch(() => {})
+
+    return task
+  }
+
+  /**
+   * Corpo real de setActiveProvider, só executado quando é a vez desta
+   * chamada na fila de ativações (_activationQueue). Não deve ser chamado
+   * diretamente de fora — sempre passe por setActiveProvider().
+   */
+  private async _setActiveProviderLocked(
+    id: string,
+    config: ProviderConfig | undefined,
+    callId: number,
+    source: string
+  ): Promise<void> {
     const factory = this.providers.get(id)
     if (!factory) {
       throw new Error(`Provider "${id}" não encontrado. Providers disponíveis: ${this.getProviderIds().join(', ')}`)
     }
 
+    // ---- Checagem de idempotência ----
+    const sameProvider = this.activeProviderId === id
+    const sameProject =
+      !!config && !!this.activeConfig && this.activeConfig.projectPath === config.projectPath
+    const sameRelevantConfig =
+      !!config &&
+      !!this.activeConfig &&
+      this.activeConfig.model === config.model &&
+      this.activeConfig.effort === config.effort &&
+      this.activeConfig.webSearch === config.webSearch
+    const alreadyRunning = this.activeProvider?.isRunning() ?? false
+
+    if (sameProvider && sameProject && sameRelevantConfig && alreadyRunning) {
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} SKIPPED (idempotente)`, {
+        id,
+        projectPath: config?.projectPath,
+        source,
+        reason: 'provider já ativo para o mesmo projeto/config e já rodando',
+      })
+      return
+    }
+
+    console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} EXECUTING (não idempotente)`, {
+      id,
+      projectPath: config?.projectPath,
+      source,
+      reason: !sameProvider
+        ? 'provider diferente do ativo'
+        : !sameProject
+          ? 'projectPath diferente'
+          : !sameRelevantConfig
+            ? 'config relevante diferente (model/effort/webSearch)'
+            : 'provider não está rodando',
+    })
+
     // Parar provider atual se houver
     if (this.activeProvider) {
-      console.log('[DEBUG] [ProviderManager] setActiveProvider - stopping current provider')
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - stopping current provider`)
       await this.stop()
     }
 
     // Reusar instância cacheada se existir (preserva setProcessManagerRef), senão criar nova
     let provider = this.instances.get(id)
     if (!provider) {
-      console.log('[DEBUG] [ProviderManager] setActiveProvider - creating new provider instance')
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - creating new provider instance`)
       provider = factory(this)
       this.instances.set(id, provider)
     } else {
-      console.log('[DEBUG] [ProviderManager] setActiveProvider - reusing cached instance')
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - reusing cached instance`)
     }
 
     this.activeProvider = provider
@@ -239,11 +344,11 @@ export class ProviderManager {
 
     // Se config fornecida, iniciar
     if (config) {
-      console.log('[DEBUG] [ProviderManager] setActiveProvider - calling start with config')
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - calling start with config`)
       await this.start(config)
     }
 
-    console.log(`[ProviderManager] Provider ativo: ${this.activeProvider.getName()} (${id})`)
+    console.log(`[ProviderManager] setActiveProvider#${callId} Provider ativo: ${this.activeProvider.getName()} (${id})`)
   }
 
   /**

@@ -112,6 +112,17 @@ let outputCleanup: (() => void) | null = null
 let errorCleanup: (() => void) | null = null
 let exitCleanup: (() => void) | null = null
 
+// BUG C (defesa em profundidade no renderer):
+// `isProviderRunning` só vira `true` DEPOIS que startProvider() resolve.
+// Se sendToProvider() for chamado concorrentemente (ex.: duplo clique no
+// botão de enviar, Enter disparando 2x antes do primeiro processar), cada
+// chamada lê `isProviderRunning: false` e, sem este mutex, cada uma
+// dispararia sua PRÓPRIA chamada startProvider() — múltiplas chamadas
+// concorrentes de setActiveProvider no main process. O main process agora
+// serializa e deduplica isso (ver Provider.ts), mas mantemos esta trava
+// aqui também para não depender só da camada main.
+let providerStartPromise: Promise<void> | null = null
+
 export const useStore = create<InfinyState>()(
   persist(
     (set, get) => ({
@@ -279,21 +290,46 @@ export const useStore = create<InfinyState>()(
 
         let assistantMessageId = ''
 
-        // Iniciar provider se não estiver rodando
+        // Iniciar provider se não estiver rodando.
+        // Usa o mutex providerStartPromise (ver comentário no topo do arquivo)
+        // para garantir que chamadas concorrentes de sendToProvider aguardem
+        // a MESMA chamada startProvider em andamento, em vez de cada uma
+        // disparar a sua própria.
         if (!state.isProviderRunning) {
+          let myStartPromise: Promise<void> | null = null
           try {
-            console.log('[Renderer] [Pipeline] sendToProvider - Starting provider for project:', currentProject.path)
-            await window.electronAPI?.startProvider(currentProject.path, {
-              model: settings.model,
-              effort: settings.effort,
-              webSearch: settings.webSearch,
-            })
-            console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
-            // Aguardar um pouco para o provider iniciar
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            if (!providerStartPromise) {
+              console.log('[Renderer] [Pipeline] sendToProvider - Starting provider for project:', currentProject.path)
+              myStartPromise = (async () => {
+                await window.electronAPI?.startProvider(
+                  currentProject.path,
+                  {
+                    model: settings.model,
+                    effort: settings.effort,
+                    webSearch: settings.webSearch,
+                  },
+                  'renderer:infinyStore.sendToProvider'
+                )
+                console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
+                // Aguardar um pouco para o provider iniciar
+                await new Promise((resolve) => setTimeout(resolve, 500))
+              })()
+              providerStartPromise = myStartPromise
+            } else {
+              console.log('[Renderer] [Pipeline] sendToProvider - reusing in-flight startProvider call')
+            }
+
+            await providerStartPromise
           } catch (error) {
             console.error('[Renderer] [Pipeline] sendToProvider - Error starting provider:', error)
             return
+          } finally {
+            // Só limpa o mutex se ainda apontar para a promise que ESTA
+            // chamada criou (evita apagar a referência de uma chamada mais
+            // nova que possa ter sido criada nesse meio-tempo).
+            if (myStartPromise && providerStartPromise === myStartPromise) {
+              providerStartPromise = null
+            }
           }
         }
 

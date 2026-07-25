@@ -82,8 +82,8 @@ const electronAPI = {
   // ---------- Provider / Processos ----------
   getProcessStatusSnapshot: (): Promise<ProcessStatusSnapshot> =>
     ipcRenderer.invoke('get-process-status-snapshot'),
-  startProvider: (projectPath: string, config?: Partial<ProviderConfig>): Promise<StartProviderResult> =>
-    ipcRenderer.invoke('start-provider', projectPath, config),
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>, source?: string): Promise<StartProviderResult> =>
+    ipcRenderer.invoke('start-provider', projectPath, config, source),
   sendToProvider: (chatId: string, message: string, images?: string[]): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('send-to-provider', chatId, message, images),
   stopProvider: (): Promise<{ success: boolean }> => ipcRenderer.invoke('stop-provider'),

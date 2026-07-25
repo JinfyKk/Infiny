@@ -276,8 +276,15 @@ function setupProviderListeners(): void {
  * Isso resolve o erro "ProcessManager não injetado. Chame setProcessManagerRef
  * antes de start()." que ocorria porque a injeção rodava DEPOIS do start().
  */
-async function initializeActiveProvider(projectPath: string): Promise<void> {
-  console.log('[Main] [Pipeline] initializeActiveProvider START', { projectPath, activeProviderId, activeProviderConfig })
+async function initializeActiveProvider(projectPath: string, source = 'unknown'): Promise<void> {
+  console.log('[Main] [Pipeline] initializeActiveProvider START', {
+    projectPath,
+    activeProviderId,
+    activeProviderConfig,
+    source,
+    timestamp: new Date().toISOString(),
+  })
+  console.log(`[Main] [Pipeline] initializeActiveProvider origin stack:\n${new Error('initializeActiveProvider origin').stack}`)
   const pm = getProcessManager()
   const config: ProviderConfig = {
     ...activeProviderConfig,
@@ -311,7 +318,7 @@ async function initializeActiveProvider(projectPath: string): Promise<void> {
 
     // 3. Agora sim, iniciar o provider já com o ProcessManager disponível
     console.log('[Main] [Pipeline] Calling setActiveProvider with config')
-    await providerManager.setActiveProvider(activeProviderId, config)
+    await providerManager.setActiveProvider(activeProviderId, config, source)
     console.log('[Main] [Pipeline] setActiveProvider completed successfully')
 
     sendToRenderer('provider-started', { providerId: activeProviderId })
@@ -451,20 +458,25 @@ ipcMain.handle('get-process-status-snapshot', () => {
  * Inicia o provedor para um projeto.
  * Se já estiver rodando com mesmo provedor/config, apenas reconecta.
  */
-ipcMain.handle('start-provider', async (_event, projectPath: string, config?: Partial<ProviderConfig>) => {
+ipcMain.handle('start-provider', async (_event, projectPath: string, config?: Partial<ProviderConfig>, source?: string) => {
+  console.log('[Main] [IPC] start-provider RECEIVED', { projectPath, config, source })
   try {
     // Atualizar config se fornecida
     if (config) {
       activeProviderConfig = { ...activeProviderConfig, ...config }
     }
 
-    // Se já está rodando com mesmo provedor, apenas atualiza config se mudou
-    if (providerManager.isRunning() && providerManager.getActiveProviderId() === activeProviderId) {
-      // Para simplificar, reiniciamos com nova config
-      await stopActiveProvider()
-    }
-
-    await initializeActiveProvider(projectPath)
+    // NOTA (fix BUG C): anteriormente esta função SEMPRE parava o provider
+    // ativo antes de chamar initializeActiveProvider quando ele já estava
+    // rodando com o mesmo provedor — mesmo que o projectPath e a config
+    // fossem exatamente os mesmos ("para simplificar, reiniciamos com nova
+    // config"). Isso causava um ciclo stop→start desnecessário a cada
+    // chamada repetida (ex.: múltiplas invocações concorrentes desta mesma
+    // IPC). A decisão de parar/reiniciar agora é feita de forma centralizada
+    // e idempotente dentro de providerManager.setActiveProvider(), que só
+    // faz stop→start quando o provider, o projectPath ou a config
+    // relevante realmente mudaram.
+    await initializeActiveProvider(projectPath, source ?? 'ipc:start-provider')
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -584,7 +596,7 @@ ipcMain.handle('set-active-provider', async (_event, providerId: string, config?
     const projects = getProjects()
     const currentProject = projects.find((p) => p.lastOpened === Math.max(...projects.map((p) => p.lastOpened)))
     if (currentProject) {
-      await initializeActiveProvider(currentProject.path)
+      await initializeActiveProvider(currentProject.path, 'ipc:set-active-provider')
     }
 
     return { success: true }
@@ -717,7 +729,7 @@ app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
     if (lastProject) {
       console.log('[DEBUG] initializeActiveProvider() - START for:', lastProject.path)
       try {
-        await initializeActiveProvider(lastProject.path)
+        await initializeActiveProvider(lastProject.path, 'app:boot')
         console.log('[DEBUG] initializeActiveProvider() - END SUCCESS')
       } catch (error) {
         console.error('[DEBUG] initializeActiveProvider() - ERROR:', error)

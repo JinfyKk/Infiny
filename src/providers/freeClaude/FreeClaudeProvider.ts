@@ -134,8 +134,15 @@ export class FreeClaudeProvider implements AIProvider {
    * Cada chamada aguarda a operação anterior terminar antes de prosseguir.
    */
   async start(config: ProviderConfig): Promise<void> {
-    // Adicionar à fila de operações - aguarda operação anterior terminar
-    this._opQueue = this._opQueue.then(async () => {
+    // Adicionar à fila de operações - aguarda operação anterior terminar.
+    // IMPORTANTE: encadeamos a fila via `task.catch(() => {})`, não via
+    // `this._opQueue.then(...)` diretamente. Se atribuíssemos a promise que
+    // pode rejeitar direto a this._opQueue, um erro aqui deixaria a fila
+    // permanentemente rejeitada — toda chamada futura de start()/stop()
+    // encadearia num `.then()` sobre uma promise já rejeitada e pularia
+    // seu callback silenciosamente (nunca mais rodaria). `task` ainda
+    // rejeita normalmente para quem chamou este start() especificamente.
+    const task = this._opQueue.then(async () => {
       console.log('[DEBUG] [FreeClaudeProvider] start() - START (queue)')
       this.config = { ...config } as ProviderConfig & { freeProvider?: string }
 
@@ -204,8 +211,10 @@ export class FreeClaudeProvider implements AIProvider {
       this.readyCallback?.()
     })
 
-    // Aguardar a operação na fila completar
-    await this._opQueue
+    this._opQueue = task.catch(() => {})
+
+    // Aguardar (e propagar erro de) esta operação especificamente
+    await task
   }
 
   /**
@@ -752,7 +761,8 @@ export class FreeClaudeProvider implements AIProvider {
    */
   async stop(): Promise<void> {
     // Adicionar à fila de operações - aguarda operação anterior terminar
-    this._opQueue = this._opQueue.then(async () => {
+    // (ver comentário em start() sobre por que separamos `task` de `this._opQueue`)
+    const task = this._opQueue.then(async () => {
       console.log('[FreeClaudeProvider] Stopping... (queue)')
 
       try {
@@ -777,8 +787,10 @@ export class FreeClaudeProvider implements AIProvider {
       console.log('[FreeClaudeProvider] Stopped')
     })
 
-    // Aguardar a operação na fila completar
-    await this._opQueue
+    this._opQueue = task.catch(() => {})
+
+    // Aguardar (e propagar erro de) esta operação especificamente
+    await task
   }
 
   /**
