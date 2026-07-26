@@ -89,63 +89,6 @@ function AppContent() {
         'flex-1 flex flex-col overflow-hidden transition-all duration-300',
         isSidebarOpen ? 'lg:ml-72' : 'lg:ml-0'
       )}>
-        {/* Top Bar */}
-        <header className="flex items-center justify-between h-12 px-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainerVariants}
-            className="flex items-center gap-3"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden"
-              aria-label={isSidebarOpen ? 'Fechar menu' : 'Abrir menu'}
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-
-            {currentProject && (
-              <motion.div
-                variants={fadeInUpVariants}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
-              >
-                <FolderOpen className="w-4 h-4 text-textSecondary" />
-                <span className="text-sm font-medium text-textPrimary truncate max-w-[200px]">{currentProject.name}</span>
-              </motion.div>
-            )}
-
-            {currentChat && (
-              <motion.div
-                variants={fadeInUpVariants}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
-              >
-                <FileText className="w-4 h-4 text-textSecondary" />
-                <span className="text-sm font-medium text-textPrimary truncate max-w-[250px]">{currentChat.title}</span>
-              </motion.div>
-            )}
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainerVariants}
-            className="flex items-center gap-2"
-          >
-            <Button
-              variant={isFilesPanelOpen ? 'subtle' : 'ghost'}
-              size="icon"
-              onClick={() => setFilesPanelOpen(!isFilesPanelOpen)}
-              aria-label="Arquivos gerados"
-            >
-              <FileText className="w-5 h-5" />
-            </Button>
-            <ThemeSelector />
-          </motion.div>
-        </header>
-
         {/* Chat Area */}
         <ChatArea
           isFilesPanelOpen={isFilesPanelOpen}

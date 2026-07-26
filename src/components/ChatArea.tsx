@@ -160,7 +160,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     e.target.value = ''
   }
 
-  if (!currentChat || !currentProject) {
+  if (!currentChat) {
     return (
       <div className="flex-1 flex flex-col bg-background overflow-hidden">
         <div className="flex-1 flex items-center justify-center p-8">
@@ -228,15 +228,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
             className="flex items-center gap-1"
           >
             <ProviderSelector />
-            <ModelSelector
-              model={settings.model}
-              onChange={(model) => updateSettings({ model })}
-              fetchModels={loadModels}
-            />
-            <EffortSelector
-              effort={settings.effort}
-              onChange={(effort) => updateSettings({ effort })}
-            />
+            <ModelSelector fetchModels={loadModels} />
+            <EffortSelector />
           </motion.div>
 
           <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
