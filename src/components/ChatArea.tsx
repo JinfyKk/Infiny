@@ -206,15 +206,27 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
           transition={transitions.smooth}
           className="flex items-center gap-2"
         >
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...transitions.smooth, delay: 0.05 }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
-          >
-            <FolderOpen className="w-4 h-4 text-textSecondary" />
-            <span className="text-sm font-medium text-text truncate max-w-[200px]">{currentProject.name}</span>
-          </motion.div>
+          {currentProject ? (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transitions.smooth, delay: 0.05 }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+            >
+              <FolderOpen className="w-4 h-4 text-textSecondary" />
+              <span className="text-sm font-medium text-text truncate max-w-[200px]">{currentProject.name}</span>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transitions.smooth, delay: 0.05 }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border"
+            >
+              <MessageSquare className="w-4 h-4 text-textSecondary" />
+              <span className="text-sm font-medium text-text truncate max-w-[200px]">Chat Independente</span>
+            </motion.div>
+          )}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}

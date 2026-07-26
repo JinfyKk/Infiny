@@ -25,10 +25,10 @@ export function ThemeSelector() {
   const THEME_MENU_WIDTH = 220
 
   const {
-    portalPosition,
+    left,
+    top,
     placement,
     maxHeight,
-    width,
     dropdownRef,
   } = useDropdownPosition(triggerRef, {
     isOpen,
@@ -89,7 +89,7 @@ export function ThemeSelector() {
   const portalContent = isOpen ? (
     <>
       <motion.div
-        ref={dropdownRef}
+        ref={dropdownRef as any}
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
@@ -100,7 +100,8 @@ export function ThemeSelector() {
         style={{
           pointerEvents: 'auto',
           maxHeight: `${maxHeight}px`,
-          ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
+          top,
+          left,
         }}
       >
         <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">

@@ -528,8 +528,11 @@ export class ProviderManager {
       const timestamp = new Date().toISOString()
       console.log(`[SEND 27-EXIT] [${timestamp}] [main] ProviderManager.onExit FORWARDING to ${this.exitListeners.size} global listeners`)
       this.exitListeners.forEach((cb) => cb(code))
-      // Auto-cleanup quando provider para
-      this.cleanupProviderListeners()
+      // Removido: cleanupProviderListeners() aqui zerava dataCallback/responseCompleteCallback/
+      // readyCallback toda vez que restartClaudeCli() reiniciava SÓ o processo claude (troca de
+      // projeto/model/effort), deixando o provider "surdo" pro resto da sessão (resposta chegava
+      // no log mas nunca era encaminhada pra renderer). A limpeza de verdade já é feita em
+      // ProviderManager.stop(), quando o provider é trocado por outro de fato.
     })
 
     this.activeReadyCleanup = this.activeProvider.onReady?.(() => {

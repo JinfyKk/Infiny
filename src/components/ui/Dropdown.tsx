@@ -57,11 +57,11 @@ export function Dropdown({
   const shouldReduceMotion = useReducedMotion()
 
   const {
-    portalPosition,
+    left,
+    top,
     placement,
     maxHeight: calculatedMaxHeight,
     width,
-    updatePosition,
     dropdownRef,
   } = useDropdownPosition(triggerRef, {
     isOpen,
@@ -181,7 +181,7 @@ export function Dropdown({
   const portalContent = isOpen ? (
     <>
       <motion.div
-        ref={dropdownRef}
+        ref={dropdownRef as any}
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
@@ -193,7 +193,8 @@ export function Dropdown({
           pointerEvents: 'auto',
           minWidth: `${width}px`,
           maxHeight: `${effectiveMaxHeight}px`,
-          ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
+          top,
+          left,
         }}
       >
         <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">

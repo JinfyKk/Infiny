@@ -27,6 +27,7 @@ interface ModelSelectorProps {
   minWidth?: number
   triggerClassName?: string
   className?: string
+  fetchModels?: () => Promise<ModelOption[]>
 }
 
 export function ModelSelector({
@@ -35,8 +36,9 @@ export function ModelSelector({
   minWidth = 200,
   triggerClassName = '',
   className,
+  fetchModels,
 }: ModelSelectorProps) {
-  const { settings, updateSettings, currentChat, isChatGenerating, fetchModels } = useStore()
+  const { settings, updateSettings, currentChat, isChatGenerating } = useStore()
 
   const chatId = currentChat?.id
   const isGenerating = chatId ? isChatGenerating(chatId) : false
@@ -54,10 +56,10 @@ export function ModelSelector({
   const THEME_MENU_WIDTH = 220
 
   const {
-    portalPosition,
+    left,
+    top,
     placement,
     maxHeight,
-    width,
     dropdownRef,
   } = useDropdownPosition(triggerRef, {
     isOpen,
@@ -161,7 +163,7 @@ export function ModelSelector({
   const portalContent = isOpen ? (
     <>
       <motion.div
-        ref={dropdownRef}
+        ref={dropdownRef as any}
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
@@ -172,7 +174,8 @@ export function ModelSelector({
         style={{
           pointerEvents: 'auto',
           maxHeight: `${maxHeight}px`,
-          ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
+          top,
+          left,
         }}
       >
         <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">
