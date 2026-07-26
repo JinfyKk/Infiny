@@ -1,114 +1,66 @@
 'use client'
 
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Palette, Sun, Moon, Monitor, Zap, Circle as LucideCircle, TreePine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 import { ThemeName, themeLabels, themeDescriptions } from './themes'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
   dropdownVariants,
   dropdownItemVariants,
   staggerContainerVariants,
   transitions,
 } from '@/lib/transitions'
+import { useDropdownPosition } from '@/hooks/useDropdownPosition'
 
 export function ThemeSelector() {
   const { theme, setTheme, availableThemes } = useTheme()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState(false)
-  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null)
   const [hoveredTheme, setHoveredTheme] = useState<ThemeName | null>(null)
   const shouldReduceMotion = useReducedMotion()
 
-  const updatePortalPosition = useCallback(() => {
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setPortalPosition({ top: rect.bottom + 6, left: rect.left })
-      console.log('[ThemeSelector][BUG1] Portal position calculated', {
-        triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
-        portalPosition: { top: rect.bottom + 6, left: rect.left },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      })
-    }
-  }, [])
+  const THEME_MENU_WIDTH = 220
+
+  const { portalPosition } = useDropdownPosition(triggerRef, isOpen, {
+    minWidth: THEME_MENU_WIDTH,
+    margin: 8,
+  })
 
   const currentThemeLabel = themeLabels[theme]
 
+  // Click outside to close
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null
-    let listenerAttached = false
+    if (!isOpen) return
 
-    function handleClickOutside(event: MouseEvent) {
-      console.log('[ThemeSelector][BUG1] 🎯 CLICK OUTSIDE HANDLER FIRED', {
-        eventType: event.type,
-        target: event.target,
-        targetTag: (event.target as Element)?.tagName,
-        targetId: (event.target as Element)?.id,
-        targetClass: (event.target as HTMLElement)?.className,
-        composedPath: event.composedPath?.().map((el: any) => el.tagName || el.nodeName).slice(0, 8),
-        triggerRef: triggerRef.current ? 'exists' : 'null',
-        dropdownRef: dropdownRef.current ? 'exists' : 'null',
-        triggerContains: triggerRef.current?.contains(event.target as Node),
-        dropdownContains: dropdownRef.current?.contains(event.target as Node),
-        listenerAttached,
-        isOpen,
-      })
-
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node) &&
         dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        !event.composedPath().includes(triggerRef.current)
+        !dropdownRef.current.contains(event.target as Node)
       ) {
-        console.log('[ThemeSelector][BUG1] ✅ CLOSING DROPDOWN via click outside')
         setIsOpen(false)
-      } else {
-        console.log('[ThemeSelector][BUG1] ❌ IGNORING CLICK (inside trigger or dropdown)')
       }
     }
 
-    if (isOpen) {
-      console.log('[ThemeSelector][BUG1] 📝 REGISTERING CLICK OUTSIDE LISTENER (setTimeout 0)')
-      timer = setTimeout(() => {
-        listenerAttached = true
-        console.log('[ThemeSelector][BUG1] 📝 LISTENER ACTUALLY ATTACHED NOW')
-        document.addEventListener('mousedown', handleClickOutside)
-      }, 0)
-      return () => {
-        clearTimeout(timer!)
-        if (listenerAttached) {
-          console.log('[ThemeSelector][BUG1] 🧹 CLEANUP: removing listener')
-          document.removeEventListener('mousedown', handleClickOutside)
-        }
-      }
+    // Use setTimeout to avoid closing immediately on open
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen])
 
-  // === DIAGNOSTIC LOGS - BUG 1 ===
   const handleToggle = useCallback(() => {
-    console.log('[ThemeSelector][BUG1] ▶▶▶ TOGGLE CALLED', {
-      isOpenBefore: isOpen,
-      triggerRef: triggerRef.current ? 'exists' : 'null',
-      dropdownRef: dropdownRef.current ? 'exists' : 'null',
-    })
-    setIsOpen((prev) => {
-      const next = !prev
-      console.log('[ThemeSelector][BUG1] ▶▶▶ ISOPEN CHANGED', { before: prev, after: next })
-      if (next && triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect()
-        console.log('[ThemeSelector][BUG1] Portal position', {
-          triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
-          expectedTop: rect.bottom + 6,
-          expectedLeft: rect.left,
-        })
-      }
-      return next
-    })
-  }, [isOpen])
+    setIsOpen((prev) => !prev)
+  }, [])
 
   const handleSelectTheme = useCallback((newTheme: ThemeName) => {
     setTheme(newTheme)
@@ -129,10 +81,6 @@ export function ThemeSelector() {
 
   const portalContent = isOpen ? (
     <>
-      {triggerRef.current && (() => {
-        updatePortalPosition()
-        return null
-      })()}
       <motion.div
         ref={dropdownRef}
         variants={dropdownVariants}
@@ -222,7 +170,7 @@ export function ThemeSelector() {
         </motion.div>
       </button>
 
-      <AnimatePresence>{createPortal(portalContent, document.body)}</AnimatePresence>
+      {portalContent && createPortal(portalContent, document.body)}
     </div>
   )
 }

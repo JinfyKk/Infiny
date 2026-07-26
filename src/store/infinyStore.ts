@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// Constante para chats independentes (sem projeto)
+export const INDEPENDENT_PROJECT_ID = 'independent'
+
 export interface Project {
   id: string
   name: string
@@ -77,6 +80,7 @@ interface InfinyState {
   setCurrentProject: (project: Project | null) => void
   loadChatsForProject: (projectId: string, projectPath: string) => Promise<void>
   addChat: (chat: Omit<Chat, 'id' | 'createdAt' | 'updatedAt'>) => Chat
+  addIndependentChat: () => Chat
   updateChat: (id: string, updates: Partial<Chat>) => void
   removeChat: (id: string) => void
   renameChat: (id: string, newTitle: string) => void
@@ -148,7 +152,7 @@ export const useStore = create<InfinyState>()(
         set((state) => ({
           projects: state.projects.filter((p) => p.id !== id),
           currentProject: state.currentProject?.id === id ? null : state.currentProject,
-          chats: state.chats.filter((c) => c.projectId !== id),
+          chats: state.chats.filter((c) => c.projectId !== id && c.projectId !== INDEPENDENT_PROJECT_ID),
         }))
       },
 
@@ -168,21 +172,11 @@ export const useStore = create<InfinyState>()(
       },
 
       setCurrentProject: (project) => {
-        console.log('[Store][BUG4] setCurrentProject called', {
-          projectId: project?.id,
-          projectName: project?.name,
-          currentProjectBefore: get().currentProject?.name,
-          currentChatBefore: get().currentChat?.title,
-          chatsCount: get().chats.length,
-        })
+        console.log('[Store] setCurrentProject:', project?.name)
         set({ currentProject: project })
         if (project) {
           get().loadChatsForProject(project.id, project.path)
         }
-        console.log('[Store][BUG4] setCurrentProject completed', {
-          currentProjectAfter: get().currentProject?.name,
-          currentChatAfter: get().currentChat?.title,
-        })
       },
 
       addChat: (chat) => {
@@ -191,6 +185,21 @@ export const useStore = create<InfinyState>()(
           id: generateId(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
+        }
+        set((state) => ({ chats: [...state.chats, newChat], currentChat: newChat }))
+        return newChat
+      },
+
+      addIndependentChat: () => {
+        const newChat: Chat = {
+          id: generateId(),
+          projectId: INDEPENDENT_PROJECT_ID,
+          title: 'Nova conversa independente',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          summary: '',
+          importantInfo: '',
         }
         set((state) => ({ chats: [...state.chats, newChat], currentChat: newChat }))
         return newChat
@@ -228,36 +237,42 @@ export const useStore = create<InfinyState>()(
       },
 
       setCurrentChat: (chat) => {
-        console.log('[Store][BUG4] setCurrentChat called', {
-          chatId: chat?.id,
-          chatTitle: chat?.title,
-          chatProjectId: chat?.projectId,
-          currentProjectBefore: get().currentProject?.name,
-          currentChatBefore: get().currentChat?.title,
-        })
+        console.log('[Store] setCurrentChat:', chat?.title)
         set({ currentChat: chat })
         // Configurar listeners do provider quando muda o chat
         get()._setupElectronListeners()
-        console.log('[Store][BUG4] setCurrentChat completed', {
-          currentChatAfter: get().currentChat?.title,
-          currentProjectAfter: get().currentProject?.name,
-        })
       },
 
       addMessage: (chatId, message) => {
         const newMessage: ChatMessage = { ...message, id: generateId() }
-        set((state) => ({
-          chats: state.chats.map((c) =>
-            c.id === chatId ? { ...c, messages: [...c.messages, newMessage], updatedAt: Date.now() } : c
-          ),
-          currentChat: state.currentChat?.id === chatId
-            ? { ...state.currentChat, messages: [...state.currentChat.messages, newMessage], updatedAt: Date.now() }
-            : state.currentChat,
-        }))
+        set((state) => {
+          const chat = state.chats.find((c) => c.id === chatId)
+          const isFirstUserMessage = chat && chat.messages.length === 0 && message.role === 'user'
+          const shouldAutoName = isFirstUserMessage && (chat?.title === 'Nova conversa' || chat?.title === 'Novo Chat' || chat?.title === 'Nova conversa independente')
+
+          return {
+            chats: state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              let updatedChat = { ...c, messages: [...c.messages, newMessage], updatedAt: Date.now() }
+              if (shouldAutoName) {
+                updatedChat = { ...updatedChat, title: generateChatTitle(message.content) }
+              }
+              return updatedChat
+            }),
+            currentChat: state.currentChat?.id === chatId
+              ? (() => {
+                  let updated = { ...state.currentChat, messages: [...state.currentChat.messages, newMessage], updatedAt: Date.now() }
+                  if (shouldAutoName) {
+                    updated = { ...updated, title: generateChatTitle(message.content) }
+                  }
+                  return updated
+                })()
+              : state.currentChat,
+          }
+        })
       },
 
       updateMessage: (chatId, messageId, updates) => {
-        console.log('[Store][BUG2] updateMessage called', { chatId, messageId, updatesKeys: Object.keys(updates) })
         set((state) => ({
           chats: state.chats.map((c) =>
             c.id === chatId
@@ -287,7 +302,6 @@ export const useStore = create<InfinyState>()(
       },
 
       setChatGenerating: (chatId: string, generating: boolean) => {
-        console.log('[Store][BUG3] setChatGenerating called', { chatId, generating })
         set((state) => ({
           chats: state.chats.map((c) =>
             c.id === chatId ? { ...c, isGenerating: generating, updatedAt: Date.now() } : c
@@ -479,7 +493,7 @@ export const useStore = create<InfinyState>()(
           const existingChats = get().chats.filter((c) => c.projectId === projectId)
           if (existingChats.length > 0) {
             console.log('[Store] Using existing', existingChats.length, 'chats for project:', projectId)
-            // If we have a currentChat but it's not from this project, switch to first chat
+            // Always select the first chat if we don't have a current chat for this project
             const currentChat = get().currentChat
             if (!currentChat || currentChat.projectId !== projectId) {
               get().setCurrentChat(existingChats[0])
@@ -510,11 +524,11 @@ export const useStore = create<InfinyState>()(
               importantInfo: projectData.importantInfo,
             }
 
-            set((state) => ({ chats: [...state.chats, newChat], currentChat: newChat }))
+            set((state) => ({ chats: [...state.chats, newChat] }))
             get().setCurrentChat(newChat)
           } else {
-            // No history - create a new empty chat (BUG 4 fix)
-            console.log('[Store][BUG4] No history for project, creating new empty chat')
+            // No history - create a new empty chat
+            console.log('[Store] No history for project, creating new empty chat')
             const newChat = get().addChat({
               projectId,
               title: 'Nova conversa',
@@ -634,6 +648,52 @@ export const useStore = create<InfinyState>()(
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+}
+
+/**
+ * Gera um título curto para o chat baseado na primeira mensagem do usuário.
+ * Estilo ChatGPT: extrai palavras-chave e trunca para ~35 caracteres.
+ */
+function generateChatTitle(firstMessage: string): string {
+  const text = firstMessage.trim()
+  if (!text) return 'Nova conversa'
+
+  // Remover saudações comuns e palavras de preenchimento
+  const stopWords = new Set([
+    'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas',
+    'de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas',
+    'por', 'para', 'com', 'sem', 'sobre', 'entre', 'apos', 'ate',
+    'e', 'ou', 'mas', 'que', 'se', 'como', 'qual', 'quais',
+    'quanto', 'quantos', 'quanta', 'quantas', 'onde', 'quando',
+    'olá', 'oi', 'ola', 'eai', 'e aí', 'tudo', 'bem', '?', '!', '.',
+    'please', 'por favor', 'poderia', 'pode', 'poderias', 'me', 'dizer',
+    'explicar', 'explica', 'me ajude', 'ajuda', 'preciso', 'gostaria',
+    'quero', 'queria', 'quais', 'qual', 'quanto', 'tempo'
+  ])
+
+  // Extrair palavras significativas
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !stopWords.has(w))
+    .slice(0, 8)
+
+  let title = words.join(' ')
+
+  // Capitalizar primeira letra de cada palavra
+  title = title
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+  // Truncar se muito longo
+  if (title.length > 35) {
+    title = title.slice(0, 35).trim() + '…'
+  }
+
+  // Fallback se não extraiu nada útil
+  return title || 'Nova conversa'
 }
 
 // Exportar constantes para uso em componentes

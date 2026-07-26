@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { DropdownOption } from '@/components/ui/Dropdown'
 import { Brain, Terminal, Globe, Sparkles } from 'lucide-react'
@@ -70,20 +70,30 @@ export function ProviderSelector() {
   const chatId = currentChat?.id
   const isGenerating = chatId ? isChatGenerating(chatId) : false
 
+  const PROVIDER_MENU_WIDTH = 200
+
   const updatePortalPosition = useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
-      setPortalPosition({ top: rect.bottom + 6, left: rect.left })
-      console.log('[ProviderSelector][BUG1] Portal position calculated', {
-        triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
-        portalPosition: { top: rect.bottom + 6, left: rect.left },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      })
+      const margin = 8
+      // Se não couber à direita do botão, alinha o menu pela borda direita do botão
+      // em vez de estourar pra fora da janela.
+      const left = Math.min(rect.left, window.innerWidth - PROVIDER_MENU_WIDTH - margin)
+      setPortalPosition({ top: rect.bottom + 6, left: Math.max(margin, left) })
     }
   }, [])
 
   const currentProvider = settings.provider as ProviderValue
   const currentProviderOption = PROVIDERS.find((p) => p.value === currentProvider) || PROVIDERS[0]
+
+  // Calcula a posição do portal UMA VEZ quando o dropdown abre.
+  // (antes isso era feito dentro do corpo do render, chamando setPortalPosition
+  // com um objeto novo a cada render -> loop infinito de re-render -> tela branca)
+  useLayoutEffect(() => {
+    if (isOpen) {
+      updatePortalPosition()
+    }
+  }, [isOpen, updatePortalPosition])
 
   useEffect(() => {
     const idx = PROVIDERS.findIndex((p) => p.value === currentProvider)
@@ -228,10 +238,6 @@ export function ProviderSelector() {
 
   const portalContent = isOpen ? (
     <>
-      {triggerRef.current && (() => {
-        updatePortalPosition()
-        return null
-      })()}
       <motion.div
         ref={dropdownRef}
         variants={dropdownVariants}

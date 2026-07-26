@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -11,6 +11,7 @@ import {
   staggerContainerVariants,
   transitions,
 } from '@/lib/transitions'
+import { useDropdownPosition } from '@/hooks/useDropdownPosition'
 
 export interface DropdownOption {
   value: string
@@ -51,23 +52,15 @@ export function Dropdown({
   className,
 }: DropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null)
   const shouldReduceMotion = useReducedMotion()
 
-  const updatePortalPosition = useCallback(() => {
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setPortalPosition({ top: rect.bottom + 6, left: rect.left })
-      console.log('[Dropdown][BUG1] Portal position calculated', {
-        triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right, width: rect.width, height: rect.height },
-        portalPosition: { top: rect.bottom + 6, left: rect.left },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      })
-    }
-  }, [])
+  const { portalPosition } = useDropdownPosition(triggerRef, isOpen, {
+    minWidth,
+    margin: 8,
+    maxWidth: 280,
+  })
 
   // Memoize display options
   const displayOptions = useMemo(() => (options.length > 0 ? options : []), [options])
@@ -77,26 +70,13 @@ export function Dropdown({
     setSelectedIndex(idx >= 0 ? idx : 0)
   }, [value, displayOptions])
 
-  // === DIAGNOSTIC LOGS - BUG 1 ===
   const toggle = useCallback(() => {
     if (!disabled) {
-      console.log('[Dropdown][BUG1] ▶▶▶ TOGGLE CALLED', {
-        disabled,
-        isOpenBefore: isOpen,
-        triggerRef: triggerRef.current ? 'exists' : 'null',
-        dropdownRef: dropdownRef.current ? 'exists' : 'null',
-        stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
-      })
-      setIsOpen((prev) => {
-        const next = !prev
-        console.log('[Dropdown][BUG1] ▶▶▶ ISOPEN CHANGED', { before: prev, after: next })
-        return next
-      })
+      setIsOpen((prev) => !prev)
     }
-  }, [disabled, isOpen])
+  }, [disabled])
 
   const close = useCallback(() => {
-    setPortalPosition(null)
     setIsOpen(false)
   }, [])
 
@@ -113,54 +93,33 @@ export function Dropdown({
 
   // Click outside to close
   useEffect(() => {
+    if (!isOpen) return
+
     let timer: ReturnType<typeof setTimeout> | null = null
     let listenerAttached = false
 
     function handleClickOutside(event: MouseEvent | TouchEvent) {
-      console.log('[Dropdown][BUG1] 🎯 CLICK OUTSIDE HANDLER FIRED', {
-        eventType: event.type,
-        target: event.target,
-        targetTag: (event.target as Element)?.tagName,
-        targetId: (event.target as Element)?.id,
-        targetClass: (event.target as HTMLElement)?.className,
-        composedPath: event.composedPath?.().map((el: any) => el.tagName || el.nodeName).slice(0, 8),
-        triggerRef: triggerRef.current ? 'exists' : 'null',
-        dropdownRef: dropdownRef.current ? 'exists' : 'null',
-        triggerContains: triggerRef.current?.contains(event.target as Node),
-        dropdownContains: dropdownRef.current?.contains(event.target as Node),
-        listenerAttached,
-        isOpen,
-      })
-
       if (
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
+        event.target instanceof Node &&
         !event.composedPath().includes(triggerRef.current)
       ) {
-        console.log('[Dropdown][BUG1] ✅ CLOSING DROPDOWN via click outside')
         close()
-      } else {
-        console.log('[Dropdown][BUG1] ❌ IGNORING CLICK (inside trigger or dropdown)')
       }
     }
 
-    if (isOpen) {
-      console.log('[Dropdown][BUG1] 📝 REGISTERING CLICK OUTSIDE LISTENER (setTimeout 0)')
-      timer = setTimeout(() => {
-        listenerAttached = true
-        console.log('[Dropdown][BUG1] 📝 LISTENER ACTUALLY ATTACHED NOW')
-        document.addEventListener('mousedown', handleClickOutside)
-        document.addEventListener('touchstart', handleClickOutside, { passive: true })
-      }, 0)
-      return () => {
-        clearTimeout(timer!)
-        if (listenerAttached) {
-          console.log('[Dropdown][BUG1] 🧹 CLEANUP: removing listeners')
-          document.removeEventListener('mousedown', handleClickOutside)
-          document.removeEventListener('touchstart', handleClickOutside)
-        }
+    timer = setTimeout(() => {
+      listenerAttached = true
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside, { passive: true })
+    }, 0)
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      if (listenerAttached) {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('touchstart', handleClickOutside)
       }
     }
   }, [isOpen, close])
@@ -210,25 +169,18 @@ export function Dropdown({
 
   const portalContent = isOpen ? (
     <>
-      {triggerRef.current && (() => {
-        updatePortalPosition()
-        return null
-      })()}
       <motion.div
-        ref={dropdownRef}
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
         transition={shouldReduceMotion ? { duration: 0 } : undefined}
-        className={cn(
-          'fixed z-50',
-          `min-w-[${minWidth}px] max-h-[${maxHeight}px]`,
-          className
-        )}
+        className={cn('fixed z-50', className)}
         role="menu"
         style={{
           pointerEvents: 'auto',
+          minWidth: `${minWidth}px`,
+          maxHeight: `${maxHeight}px`,
           ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
         }}
       >
@@ -328,7 +280,7 @@ export function Dropdown({
         </motion.div>
       </button>
 
-      <AnimatePresence>{createPortal(portalContent, document.body)}</AnimatePresence>
+      {portalContent && createPortal(portalContent, document.body)}
     </div>
   )
 }

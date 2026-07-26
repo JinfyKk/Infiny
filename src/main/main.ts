@@ -345,14 +345,11 @@ async function initializeActiveProvider(projectPath: string, source = 'unknown')
       })
     }
 
-    // 5. Escutar evento de resposta completa (específico do FreeClaudeProvider)
-    if (provider && 'onResponseComplete' in provider) {
-      console.log('[Main] [Pipeline] Registering onResponseComplete callback for FreeClaudeProvider')
-      ;(provider as any).onResponseComplete(() => {
-        console.log('[Main] [Pipeline] FreeClaudeProvider response complete, forwarding to renderer')
-        sendToRenderer('provider-response-complete', {})
-      })
-    }
+    // 5. REMOVIDO: registrar onResponseComplete direto no provider aqui sobrescrevia
+    // (sem chatId) o callback correto que o ProviderManager já registra sozinho em
+    // start() -> setupProviderListeners(). Isso causava o bug de "IA está respondendo"
+    // travado para sempre a partir da 2ª mensagem (quando setActiveProvider é pulado
+    // por idempotência e start() não roda de novo pra restaurar o callback certo).
 
     // 3. Agora sim, iniciar o provider já com o ProcessManager disponível
     console.log('[Main] [Pipeline] Calling setActiveProvider with config')

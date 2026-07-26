@@ -1,7 +1,7 @@
 import { FolderGit2, Plus, MessageSquare, ChevronRight, X, FolderOpen, Trash2, Edit2 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { cn, formatDate } from '@/lib/utils'
-import { useStore } from '@/store/infinyStore'
+import { useStore, INDEPENDENT_PROJECT_ID } from '@/store/infinyStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToastHelpers } from '@/components/ui/Toast'
@@ -31,8 +31,10 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
     renameProject,
     setCurrentProject,
     addChat,
+    addIndependentChat,
     setCurrentChat,
     removeChat,
+    renameChat,
     searchQuery,
     setSearchQuery,
   } = useStore()
@@ -49,6 +51,12 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [deleteChatId, setDeleteChatId] = useState<string | null>(null)
+
+  // Chats independentes (sem projeto)
+  const independentChats = useMemo(
+    () => chats.filter((c) => c.projectId === INDEPENDENT_PROJECT_ID),
+    [chats]
+  )
 
   const handleCreateProject = () => {
     if (newProjectPath && newProjectName) {
@@ -93,6 +101,14 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
     if (!trimmed) return
     renameProject(projectId, trimmed)
     success('Projeto renomeado', `${trimmed}`)
+    cancelEdit()
+  }
+
+  const saveChatEdit = (chatId: string) => {
+    const trimmed = editValue.trim()
+    if (!trimmed) return
+    renameChat(chatId, trimmed)
+    success('Chat renomeado', `${trimmed}`)
     cancelEdit()
   }
 
@@ -243,6 +259,141 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 <Plus className="w-4 h-4" />
                 <span>Novo Projeto</span>
               </Button>
+            )}
+          </motion.div>
+
+          {/* Chats Gerais (Independentes) */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...transitions.smooth, delay: 0.25 }}
+            className="px-4 py-2"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <MessageSquare className="w-3.5 h-3.5 text-green-500" />
+                </div>
+                <span className="font-medium text-sm text-textPrimary">Chats Gerais</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const chat = addIndependentChat()
+                  setCurrentChat(chat)
+                }}
+                aria-label="Novo chat independente"
+                className="h-7 px-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            {independentChats.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={transitions.smooth}
+                className="px-3 py-4 text-center text-textMuted border border-dashed border-border rounded-lg"
+              >
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Nenhum chat independente</p>
+                <p className="text-[10px] mt-0.5">Clique no + para criar um</p>
+              </motion.div>
+            ) : (
+              <StaggerContainer speed="normal" className="space-y-1">
+                {independentChats.map((chat) => (
+                  <AnimatePresence key={chat.id} mode="wait">
+                    {editingId !== chat.id && (
+                      <StaggerItem animation="fade">
+                        <motion.button
+                          variants={listItemVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-left transition-all duration-150',
+                            'hover:bg-surfaceHover',
+                            currentChat?.id === chat.id
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'text-textSecondary hover:text-textPrimary',
+                          )}
+                          onClick={() => setCurrentChat(chat)}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            startEditChat(chat.id, chat.title)
+                          }}
+                        >
+                          <MessageSquare
+                            className={cn(
+                              'w-4 h-4 flex-shrink-0',
+                              currentChat?.id === chat.id && 'text-primary',
+                            )}
+                          />
+                          <span className="flex-1 truncate">{chat.title}</span>
+                          <span className="text-xs text-textMuted">{formatDate(chat.updatedAt)}</span>
+                          <motion.div
+                            initial={{ opacity: 0, x: 10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={transitions.tweenFast}
+                            className="flex items-center gap-1"
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                startEditChat(chat.id, chat.title)
+                              }}
+                              aria-label="Renomear chat"
+                              interactionType="icon-pulse"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                confirmDeleteChat(chat.id)
+                              }}
+                              aria-label="Remover chat"
+                              interactionType="icon-pulse"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-error" />
+                            </Button>
+                          </motion.div>
+                        </motion.button>
+                      </StaggerItem>
+                    )}
+                    {editingId === chat.id && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={transitions.tweenFast}
+                        className="flex items-center gap-2 px-3 py-2"
+                      >
+                        <MessageSquare className="w-5 h-5 flex-shrink-0 text-green-500" />
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveChatEdit(chat.id)
+                            if (e.key === 'Escape') cancelEdit()
+                          }}
+                          onBlur={() => saveChatEdit(chat.id)}
+                          autoFocus
+                          className="flex-1 px-2 py-1.5 text-sm bg-surface border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                          aria-label="Editar nome do chat"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                ))}
+              </StaggerContainer>
             )}
           </motion.div>
 

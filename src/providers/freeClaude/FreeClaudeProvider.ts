@@ -494,11 +494,14 @@ export class FreeClaudeProvider implements AIProvider {
       console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput parsed:', parsed)
       if (parsed?.text && this.dataCallback) {
         console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput calling dataCallback', { type: parsed.type, textLength: parsed.text.length })
-        if (parsed.type === 'assistant' || parsed.type === 'result') {
+        if (parsed.type === 'assistant') {
           this.dataCallback(parsed.text)
         } else if (parsed.type === 'system') {
           this.dataCallback(`\n[${parsed.text}]\n`)
         }
+        // 'result': não reenviar o texto — já foi enviado via 'assistant'.
+        // O 'result' só dispara responseCompleteCallback() (dentro de parseStreamJson),
+        // que sinaliza fim de resposta; reenviar o texto aqui duplicava a mensagem na tela.
       }
     }
   }
