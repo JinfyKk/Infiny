@@ -16,6 +16,9 @@ export interface HealthCheckConfig {
   intervalMs: number
   check: () => Promise<boolean>
   onFailure?: (processName: string) => void
+  // Configuração de retry para health check único (usado por isHealthy)
+  singleCheckRetries?: number
+  singleCheckDelayMs?: number
 }
 
 export interface ProcessManagerEvents {
@@ -406,6 +409,49 @@ export class ProcessManager extends EventEmitter {
   isRunning(name: string): boolean {
     const info = this.processes.get(name)
     return !!info && info.status === 'running'
+  }
+
+  /**
+   * Verifica se um processo existe E está saudável.
+   * Roda o health check configurado (com retries) uma única vez.
+   * Útil para decidir se deve reusar um servidor existente vs spawnar novo.
+   */
+  async isHealthy(name: string): Promise<boolean> {
+    const info = this.processes.get(name)
+
+    if (!info || !info.process || info.status !== 'running') {
+      return false
+    }
+
+    const healthCheck = this.healthChecks.get(name)
+    if (!healthCheck) {
+      // Sem health check configurado, considera saudável se está running
+      return true
+    }
+
+    const config = healthCheck.config
+    const retries = config.singleCheckRetries ?? 3
+    const delayMs = config.singleCheckDelayMs ?? 500
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const healthy = await config.check()
+        if (healthy) {
+          console.log('[ProcessManager] isHealthy: process', name, 'is healthy (attempt', attempt, ')')
+          return true
+        }
+        console.log('[ProcessManager] isHealthy: process', name, 'health check failed (attempt', attempt, ')')
+      } catch (err) {
+        console.log('[ProcessManager] isHealthy: process', name, 'health check error (attempt', attempt, '):', err instanceof Error ? err.message : String(err))
+      }
+
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, delayMs))
+      }
+    }
+
+    console.warn('[ProcessManager] isHealthy: process', name, 'UNHEALTHY after', retries, 'attempts')
+    return false
   }
 
   /**

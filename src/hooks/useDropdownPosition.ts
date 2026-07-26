@@ -1,90 +1,76 @@
 'use client'
 
 import { useLayoutEffect, useState, useCallback, useRef, useEffect } from 'react'
+import {
+  calculateDropdownPosition,
+  DropdownPositionOptions,
+  DropdownPositionResult,
+} from '@/lib/dropdownPosition'
 
-export interface UseDropdownPositionOptions {
-  minWidth?: number
-  margin?: number
-  maxWidth?: number
+export interface UseDropdownPositionOptions extends DropdownPositionOptions {
+  /** Se o dropdown está aberto */
+  isOpen: boolean
 }
 
-export interface UseDropdownPositionReturn {
-  portalPosition: { top: number; left: number } | null
+export interface UseDropdownPositionReturn extends DropdownPositionResult {
+  /** Referência do dropdown para medição real */
+  dropdownRef: React.RefObject<HTMLDivElement | null>
+  /** Função para forçar recálculo da posição */
   updatePosition: () => void
 }
 
 /**
  * Hook para calcular e manter a posição de um dropdown portalizado.
- * Recalcula automaticamente em resize, scroll e quando o trigger muda.
+ * Usa calculateDropdownPosition que trata o viewport como bounding box físico,
+ * fazendo clamp real das coordenadas e flip automático (top/bottom).
+ *
+ * Recalcula automaticamente em:
+ * - Resize da janela
+ * - Scroll da página
+ * - Mudança de layout do trigger (via ResizeObserver)
  */
 export function useDropdownPosition(
   triggerRef: React.RefObject<HTMLElement | null>,
-  isOpen: boolean,
-  options: UseDropdownPositionOptions = {}
+  options: UseDropdownPositionOptions
 ): UseDropdownPositionReturn {
   const {
+    isOpen,
     minWidth = 200,
     margin = 8,
     maxWidth = 280,
+    preferBottom = true,
   } = options
 
-  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState<DropdownPositionResult>({
+    left: margin,
+    top: margin,
+    placement: 'bottom',
+    maxHeight: window.innerHeight - margin * 2,
+    width: minWidth,
+  })
   const updateScheduled = useRef(false)
   const rafId = useRef<number | null>(null)
 
-  const calculatePosition = useCallback(() => {
-    // Skip calculation if not open or no trigger
-    if (!isOpen || !triggerRef.current) {
-      return null
-    }
-
-    const trigger = triggerRef.current
-    const rect = trigger.getBoundingClientRect()
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    // Preferred position: below trigger, aligned left
-    let top = rect.bottom + margin
-    let left = rect.left
-
-    // Check horizontal bounds
-    const maxLeft = viewportWidth - minWidth - margin
-    if (left > maxLeft) {
-      left = Math.max(margin, maxLeft)
-    }
-    if (left < margin) {
-      left = margin
-    }
-
-    // Check vertical bounds - if doesn't fit below, try above
-    const estimatedHeight = maxWidth // rough estimate
-    if (top + estimatedHeight > viewportHeight - margin) {
-      // Try above the trigger
-      const aboveTop = rect.top - margin - estimatedHeight
-      if (aboveTop >= margin) {
-        top = aboveTop
-      }
-    }
-
-    return { top: Math.round(top), left: Math.round(left) }
-  }, [isOpen, triggerRef, minWidth, margin, maxWidth])
-
   const updatePosition = useCallback(() => {
-    if (!isOpen) {
+    if (!isOpen || !triggerRef.current) {
       return
     }
-    const position = calculatePosition()
-    if (position) {
-      setPortalPosition(position)
-    }
-  }, [calculatePosition, isOpen])
+
+    const result = calculateDropdownPosition(triggerRef, dropdownRef, {
+      margin,
+      minWidth,
+      maxWidth,
+      preferBottom,
+    })
+
+    setPosition(result)
+  }, [isOpen, triggerRef, margin, minWidth, maxWidth, preferBottom])
 
   // Initial calculation when opening
   useLayoutEffect(() => {
     if (isOpen) {
       updatePosition()
-    } else {
-      setPortalPosition(null)
     }
   }, [isOpen, updatePosition])
 
@@ -95,7 +81,6 @@ export function useDropdownPosition(
     let timeoutId: ReturnType<typeof setTimeout>
 
     const handleResize = () => {
-      // Debounce resize events
       if (timeoutId) clearTimeout(timeoutId)
       timeoutId = setTimeout(() => {
         updatePosition()
@@ -135,5 +120,9 @@ export function useDropdownPosition(
     }
   }, [isOpen, triggerRef, updatePosition])
 
-  return { portalPosition, updatePosition }
+  return {
+    ...position,
+    dropdownRef,
+    updatePosition,
+  }
 }

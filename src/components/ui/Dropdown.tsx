@@ -56,7 +56,15 @@ export function Dropdown({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const shouldReduceMotion = useReducedMotion()
 
-  const { portalPosition } = useDropdownPosition(triggerRef, isOpen, {
+  const {
+    portalPosition,
+    placement,
+    maxHeight: calculatedMaxHeight,
+    width,
+    updatePosition,
+    dropdownRef,
+  } = useDropdownPosition(triggerRef, {
+    isOpen,
     minWidth,
     margin: 8,
     maxWidth: 280,
@@ -167,9 +175,13 @@ export function Dropdown({
     }
   }, [isOpen])
 
+  // Define max-height dinâmico baseado no espaço disponível
+  const effectiveMaxHeight = Math.min(maxHeight, calculatedMaxHeight)
+
   const portalContent = isOpen ? (
     <>
       <motion.div
+        ref={dropdownRef}
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
@@ -179,8 +191,8 @@ export function Dropdown({
         role="menu"
         style={{
           pointerEvents: 'auto',
-          minWidth: `${minWidth}px`,
-          maxHeight: `${maxHeight}px`,
+          minWidth: `${width}px`,
+          maxHeight: `${effectiveMaxHeight}px`,
           ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
         }}
       >
@@ -247,6 +259,9 @@ export function Dropdown({
     </>
   ) : null
 
+  // Ícone da seta rotaciona baseado no placement
+  const chevronRotation = placement === 'top' ? 180 : 0
+
   return (
     <div className="relative">
       <button
@@ -259,8 +274,8 @@ export function Dropdown({
           disabled
             ? 'opacity-50 cursor-not-allowed bg-surface border-border text-textMuted'
             : isOpen
-              ? 'bg-primary/10 border-primary text-primary'
-              : 'bg-surface border-border text-textSecondary hover:bg-surfaceHover hover:text-textPrimary hover:border-borderHover',
+            ? 'bg-primary/10 border-primary text-primary'
+            : 'bg-surface border-border text-textSecondary hover:bg-surfaceHover hover:text-textPrimary hover:border-borderHover',
           triggerClassName
         )}
         aria-haspopup="menu"
@@ -271,8 +286,7 @@ export function Dropdown({
         {triggerIcon}
         <span className="truncate max-w-[120px]">{triggerLabel || placeholder || 'Selecionar'}</span>
         <motion.div
-          whileHover={{ rotate: isOpen ? 180 : 90 }}
-          whileTap={{ rotate: isOpen ? 180 : -90, scale: 0.9 }}
+          animate={{ rotate: chevronRotation }}
           transition={transitions.snappy}
           className="w-4 h-4 flex-shrink-0"
         >
