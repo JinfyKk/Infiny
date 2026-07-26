@@ -330,24 +330,35 @@ export const useStore = create<InfinyState>()(
 
       sendToProvider: async (chatId: string, message: string, images: string[] = []) => {
         const state = get()
-        const { currentProject, settings } = state
+        const { currentProject, settings, chats } = state
 
         const timestamp = new Date().toISOString()
         const providerId = settings.provider
         const model = settings.model
-        const projectPath = currentProject?.path
+
+        // Find the chat to determine its projectId
+        const chat = chats.find(c => c.id === chatId)
+        const isIndependentChat = chat?.projectId === INDEPENDENT_PROJECT_ID
+
+        // For independent chats, use a default working directory (user home)
+        // For project chats, use the project path
+        const projectPath = isIndependentChat
+          ? (process.env.USERPROFILE || process.env.HOME || process.cwd())
+          : currentProject?.path
+
         console.log(`[SEND 04] [${timestamp}] [renderer] sendToProvider START`, {
           chatId,
           providerId,
           model,
           projectPath,
+          isIndependentChat,
           messageLength: message.length,
           imagesCount: images.length,
           isChatGenerating: state.isChatGenerating(chatId),
         })
 
-        if (!currentProject) {
-          console.error(`[SEND 04] [${timestamp}] [renderer] sendToProvider FAILED: No current project`)
+        if (!projectPath) {
+          console.error(`[SEND 04] [${timestamp}] [renderer] sendToProvider FAILED: No project path available`)
           return
         }
 
@@ -360,15 +371,15 @@ export const useStore = create<InfinyState>()(
         let myStartPromise: Promise<void> | null = null
         try {
           if (!providerStartPromise) {
-            console.log(`[SEND 05] [${timestamp}] [renderer] Starting/ensuring provider for project`, {
-              projectPath: currentProject.path,
+            console.log(`[SEND 05] [${timestamp}] [renderer] Starting/ensuring provider for ${isIndependentChat ? 'independent chat' : 'project'}`, {
+              projectPath,
               model: settings.model,
               effort: settings.effort,
               webSearch: settings.webSearch,
             })
             myStartPromise = (async () => {
               await window.electronAPI?.startProvider(
-                currentProject.path,
+                projectPath,
                 {
                   model: settings.model,
                   effort: settings.effort,

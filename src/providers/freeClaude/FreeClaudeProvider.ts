@@ -788,6 +788,9 @@ export class FreeClaudeProvider implements AIProvider {
           console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson ASSISTANT`, { textLength: textContent.length })
           return { type: 'assistant', text: textContent }
         }
+        // Assistant message sem texto (ex.: só thinking) - ignorar silenciosamente
+        console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson ASSISTANT (no text content)`)
+        return null
       }
 
       // Tipo: result - resultado final
@@ -807,6 +810,8 @@ export class FreeClaudeProvider implements AIProvider {
         }
         if (parsed.subtype === 'thinking_tokens') {
           console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson SYSTEM_THINKING`)
+          // Retorna tipo 'thinking' com texto vazio para não disparar dataCallback
+          // O callback de resposta completa será disparado pelo tipo 'result'
           return { type: 'thinking', text: '' }
         }
       }
