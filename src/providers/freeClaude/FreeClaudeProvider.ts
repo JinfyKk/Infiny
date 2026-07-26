@@ -84,25 +84,51 @@ export class FreeClaudeProvider implements AIProvider {
    * Inicializa o provider para um projeto.
    * Orquestra: fcc-server → (health check) → fcc-claude
    *
+   * ARQUITETURA SINGLETON:
+   * - fcc-server é spawnado UMA VEZ por processo Electron
+   * - Reutiliza servidor existente se saudável
+   * - Reinicia APENAS fcc-claude quando model/effort/projectPath mudam
+   * - start() é idempotente: mesma config = no-op
+   *
    * Usa fila de operações (_opQueue) para serializar chamadas concorrentes.
    */
   async start(config: ProviderConfig): Promise<void> {
     const task = this._opQueue.then(async () => {
       console.log('[DEBUG] [FreeClaudeProvider] start() - START (queue)')
-      this.config = { ...config } as ProviderConfig
-
-      console.log('[DEBUG] [FreeClaudeProvider] start() - config:', {
-        model: this.config.model,
-        projectPath: this.config.projectPath,
+      console.log('[DEBUG] [FreeClaudeProvider] start() - incoming config:', {
+        model: config.model,
+        effort: config.effort,
+        webSearch: config.webSearch,
+        projectPath: config.projectPath,
       })
 
+      // ---- IDEMPOTÊNCIA: verificar o que mudou ----
+      const previousConfig = this.config
+      const isFirstStart = !previousConfig
+
+      // Detectar mudanças relevantes
+      const modelChanged = previousConfig ? previousConfig.model !== config.model : true
+      const effortChanged = previousConfig ? previousConfig.effort !== config.effort : true
+      const webSearchChanged = previousConfig ? previousConfig.webSearch !== config.webSearch : true
+      const projectPathChanged = previousConfig ? previousConfig.projectPath !== config.projectPath : true
+
+      // Atualizar config AGORA (antes de decisões de restart)
+      this.config = { ...config } as ProviderConfig
       this.messageBuffer = ''
 
-      // Se já rodando, parar primeiro
-      if (this.isRunning()) {
-        console.log('[DEBUG] [FreeClaudeProvider] start() - already running, stopping first')
-        await this.stop()
+      // Se nada mudou relevante e já está rodando, no-op
+      if (!isFirstStart && !modelChanged && !effortChanged && !webSearchChanged && !projectPathChanged && this.isRunning()) {
+        console.log('[DEBUG] [FreeClaudeProvider] start() - IDEMPOTENT: nothing changed, already running, skipping')
+        return
       }
+
+      console.log('[DEBUG] [FreeClaudeProvider] start() - changes detected:', {
+        isFirstStart,
+        modelChanged,
+        effortChanged,
+        webSearchChanged,
+        projectPathChanged,
+      })
 
       // 1. Checar ProcessManager (precisa já ter sido injetado pelo main.ts)
       console.log('[DEBUG] [FreeClaudeProvider] start() - checking ProcessManager, has:', !!this.processManager)
@@ -111,30 +137,25 @@ export class FreeClaudeProvider implements AIProvider {
       }
       console.log('[DEBUG] [FreeClaudeProvider] start() - ProcessManager OK')
 
-      // 2. Spawn fcc-server (sem args de config - ele lê do ~/.config/fcc/.env)
-      console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnFccServer()')
-      await this.spawnFccServer()
-      console.log('[DEBUG] [FreeClaudeProvider] start() - spawnFccServer() completed')
+      // 2. fcc-server: SINGLETON - reusar se saudável, senão spawnar
+      //    Só precisa do fcc-server rodando. Não depende de projectPath/model/effort.
+      await this.ensureFccServerRunning()
 
-      // 3. Aguardar fcc-server ficar saudável
-      console.log('[DEBUG] [FreeClaudeProvider] start() - calling waitForServerHealthy()')
-      await this.waitForServerHealthy()
-      console.log('[DEBUG] [FreeClaudeProvider] start() - waitForServerHealthy() completed')
+      // 3. fcc-claude: reiniciar SE model/effort/projectPath mudaram (ou primeiro start)
+      const claudeNeedsRestart = isFirstStart || modelChanged || effortChanged || projectPathChanged
+      if (claudeNeedsRestart) {
+        console.log('[DEBUG] [FreeClaudeProvider] start() - fcc-claude needs restart:', { modelChanged, effortChanged, projectPathChanged })
+        await this.restartClaudeCli()
+      } else {
+        console.log('[DEBUG] [FreeClaudeProvider] start() - fcc-claude unchanged, keeping running')
+      }
 
-      // 3.5. Emitir evento de servidor saudável
-      this.healthyCallback?.()
-
-      // 4. Spawn fcc-claude (launcher oficial) com args compatíveis com Claude Code
-      console.log('[DEBUG] [FreeClaudeProvider] start() - calling spawnClaudeCli()')
-      await this.spawnClaudeCli()
-      console.log('[DEBUG] [FreeClaudeProvider] start() - spawnClaudeCli() completed')
-
-      // 5. Configurar listeners de output do ProcessManager
+      // 4. Configurar listeners de output do ProcessManager (sempre reconfigurar para garantir callbacks ativos)
       console.log('[DEBUG] [FreeClaudeProvider] start() - calling setupProcessManagerListeners()')
       this.setupProcessManagerListeners()
       console.log('[DEBUG] [FreeClaudeProvider] start() - setupProcessManagerListeners() completed')
 
-      // 6. Emitir evento de provider pronto
+      // 5. Emitir evento de provider pronto
       console.log('[DEBUG] [FreeClaudeProvider] start() - emitting provider-ready event')
       this.readyCallback?.()
     })
@@ -153,15 +174,60 @@ export class FreeClaudeProvider implements AIProvider {
   }
 
   /**
-   * Spawna o fcc-server proxy.
+   * Garante que o fcc-server está rodando e saudável (SINGLETON).
+   *
+   * Fluxo:
+   * 1. Verifica se já existe processo 'fcc-server' no ProcessManager
+   * 2. Se existe e isHealthy() passa: REUTILIZA, loga "Reusing existing server", retorna
+   * 3. Se não existe ou unhealthy: spawn novo via spawnFccServerInternal()
+   * 4. Aguarda health check via waitForServerHealthy()
+   * 5. Emite healthyCallback
+   *
+   * NUNCA spawnar outro enquanto um saudável existir.
+   */
+  private async ensureFccServerRunning(): Promise<void> {
+    const pm = this.processManager!
+    console.log('[FCC] Checking existing fcc-server...')
+
+    // 1. Verificar se processo existe no ProcessManager
+    if (pm.isRunning('fcc-server')) {
+      console.log('[FCC] fcc-server process found in ProcessManager, checking health...')
+
+      // 2. Verificar saúde via ProcessManager.isHealthy()
+      const isHealthy = await pm.isHealthy('fcc-server')
+      if (isHealthy) {
+        console.log('[FCC] Existing healthy server found')
+        console.log('[FCC] Reusing existing server')
+        console.log('[FCC] Skip spawn')
+        this.healthyCallback?.()
+        return
+      }
+
+      console.log('[FCC] Existing fcc-server is UNHEALTHY, will restart')
+    } else {
+      console.log('[FCC] No fcc-server process found, will spawn new')
+    }
+
+    // 3. Spawn novo servidor (para primeira vez ou unhealthy)
+    await this.spawnFccServerInternal()
+
+    // 4. Aguardar health check
+    await this.waitForServerHealthy()
+
+    // 5. Emitir evento de servidor saudável
+    this.healthyCallback?.()
+  }
+
+  /**
+   * Spawna o fcc-server proxy (interno, chamado apenas quando necessário).
    *
    * IMPORTANTE: O fcc-server NÃO aceita argumentos CLI para configuração
    * (exceto --version). Toda configuração vem via environment variables
    * carregadas do ~/.config/fcc/.env pelo Settings do free-claude-code.
    * Fonte: free-claude-code/src/free_claude_code/cli/commands.py:serve()
    */
-  private async spawnFccServer(): Promise<void> {
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer START')
+  private async spawnFccServerInternal(): Promise<void> {
+    console.log('[FCC] [Pipeline] spawnFccServerInternal START - spawning NEW server')
     const pm = this.processManager!
     const projectPath = this.config!.projectPath || process.cwd()
 
@@ -179,10 +245,10 @@ export class FreeClaudeProvider implements AIProvider {
       ANTHROPIC_AUTH_TOKEN: 'freecc',
     }
 
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer spawning:', fccServerCmd, '(no args)')
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer config:', {
+    console.log('[FCC] [Pipeline] spawnFccServerInternal spawning:', fccServerCmd, '(no args)')
+    console.log('[FCC] [Pipeline] spawnFccServerInternal config:', {
       projectPath,
-      port: 8082, // default do fcc-server (settings.host: 0.0.0.0, settings.port: 8082)
+      port: 8082,
       host: '0.0.0.0',
       isWindows: process.platform === 'win32',
     })
@@ -206,8 +272,8 @@ export class FreeClaudeProvider implements AIProvider {
         // e o chat para de funcionar.
         shell: false,
       },
-      // Health check para fcc-server - APENAS monitora, NÃO reinicia
-      // O waitForServerHealthy() faz o monitoramento ativo durante startup
+      // Health check para fcc-server - configurado no ProcessManager para isHealthy()
+      // Também usado pelo waitForServerHealthy() para monitoramento ativo durante startup
       {
         intervalMs: 5000,
         check: async () => {
@@ -223,6 +289,9 @@ export class FreeClaudeProvider implements AIProvider {
             return false
           }
         },
+        // Configuração para isHealthy() - retries rápidos
+        singleCheckRetries: 3,
+        singleCheckDelayMs: 500,
         // SEM onFailure aqui - waitForServerHealthy() gerencia falhas
       }
     )
@@ -231,11 +300,11 @@ export class FreeClaudeProvider implements AIProvider {
     // O waitForServerHealthy() já trata tentativas e falhas adequadamente
     // pm.configureRestart('fcc-server', 3, 2000) // REMOVIDO: conflitava com health check ativo
 
-    console.log('[FreeClaudeProvider] [Pipeline] spawnFccServer END - process spawned (no auto-restart)')
+    console.log('[FCC] [Pipeline] spawnFccServerInternal END - NEW process spawned (no auto-restart)')
   }
 
   /**
-   * Aguarda o fcc-server ficar saudável.
+   * Aguarda o fcc-server ficar saudável (health check ativo durante startup).
    */
   private async waitForServerHealthy(): Promise<void> {
     console.log('[DEBUG] [FreeClaudeProvider] waitForServerHealthy() - START')
@@ -355,6 +424,25 @@ export class FreeClaudeProvider implements AIProvider {
     // Configurar auto-restart para claude (via ProcessManager)
     pm.configureRestart('claude', 3, 2000)
     console.log('[FreeClaudeProvider] [Pipeline] spawnClaudeCli END - process spawned and auto-restart configured')
+  }
+
+  /**
+   * Reinicia APENAS o fcc-claude (launcher), mantendo o fcc-server rodando.
+   * Usado quando projectPath, model ou effort mudam, mas o server não precisa reiniciar.
+   */
+  private async restartClaudeCli(): Promise<void> {
+    console.log('[FreeClaudeProvider] [Pipeline] restartClaudeCli START - restarting ONLY claude process')
+    const pm = this.processManager!
+
+    // Parar claude atual se estiver rodando
+    if (pm.isRunning('claude')) {
+      console.log('[FreeClaudeProvider] [Pipeline] restartClaudeCli - stopping existing claude')
+      await pm.stop('claude')
+    }
+
+    // Spawn novo claude com config atualizada
+    await this.spawnClaudeCli()
+    console.log('[FreeClaudeProvider] [Pipeline] restartClaudeCli END - new claude process spawned')
   }
 
   /**
@@ -590,7 +678,11 @@ export class FreeClaudeProvider implements AIProvider {
   }
 
   isRunning(): boolean {
-    return this.config !== null && this.processManager?.isRunning('claude') === true
+    return (
+      this.config !== null &&
+      this.processManager?.isRunning('claude') === true &&
+      this.processManager?.isRunning('fcc-server') === true
+    )
   }
 
   onData(callback: (data: string) => void): () => void {

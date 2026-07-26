@@ -309,6 +309,7 @@ export class ProviderManager {
       this.activeConfig.webSearch === config.webSearch
     const alreadyRunning = this.activeProvider?.isRunning() ?? false
 
+    // Caso 1: Provider IDÊNTICO, projeto IGUAL, config relevante IGUAL, já rodando -> SKIP total
     if (sameProvider && sameProject && sameRelevantConfig && alreadyRunning) {
       console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} SKIPPED (idempotente)`, {
         id,
@@ -319,24 +320,26 @@ export class ProviderManager {
       return
     }
 
-    console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} EXECUTING (não idempotente)`, {
+    console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} EXECUTING`, {
       id,
       projectPath: config?.projectPath,
       source,
       reason: !sameProvider
         ? 'provider diferente do ativo'
         : !sameProject
-          ? 'projectPath diferente'
+          ? 'projectPath diferente (mesmo provider — delegando ao provider para reutilizar fcc-server)'
           : !sameRelevantConfig
-            ? 'config relevante diferente (model/effort/webSearch)'
+            ? 'config relevante diferente (model/effort/webSearch — delegando ao provider)'
             : 'provider não está rodando',
     })
 
-    // Parar provider atual se houver
-    if (this.activeProvider) {
-      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - stopping current provider`)
+    // Caso 2: Provider DIFERENTE -> parar atual completamente
+    if (!sameProvider && this.activeProvider) {
+      console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - stopping current provider (different provider)`)
       await this.stop()
     }
+    // Caso 3: Mesmo provider, projectPath/config mudaram -> NÃO parar, delegar ao provider.start()
+    // O provider (ex: FreeClaudeProvider) decide internamente o que reiniciar (fcc-claude) vs reutilizar (fcc-server)
 
     // Reusar instância cacheada se existir (preserva setProcessManagerRef), senão criar nova
     let provider = this.instances.get(id)
@@ -351,7 +354,7 @@ export class ProviderManager {
     this.activeProvider = provider
     this.activeProviderId = id
 
-    // Se config fornecida, iniciar
+    // Se config fornecida, iniciar (provider lida com idempotência interna)
     if (config) {
       console.log(`[DEBUG] [ProviderManager] setActiveProvider#${callId} - calling start with config`)
       await this.start(config)
@@ -376,6 +379,10 @@ export class ProviderManager {
 
   /**
    * Inicia o provider ativo com a configuraÃ§Ã£o.
+   *
+   * NOTA: Esta chamada Ã© idempotente no nÃ­vel do provider.
+   * Cada provider deve implementar sua prÃ³pria lÃ³gica de reutilizaÃ§Ã£o
+   * (ex.: FreeClaudeProvider reusa fcc-server singleton).
    */
   async start(config: ProviderConfig): Promise<void> {
     console.log('[DEBUG] [ProviderManager] start called')
