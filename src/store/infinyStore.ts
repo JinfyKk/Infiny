@@ -621,7 +621,10 @@ export const useStore = create<InfinyState>()(
       name: 'infiny-storage',
       partialize: (state) => ({
         projects: state.projects,
-        chats: state.chats.map((c) => ({ ...c, messages: c.messages.slice(-50) })),
+        chats: state.chats.map((c) => {
+          const { isGenerating, ...rest } = c
+          return { ...rest, messages: c.messages.slice(-50), isGenerating: false }
+        }),
         settings: state.settings,
         isSidebarOpen: state.isSidebarOpen,
       }),
