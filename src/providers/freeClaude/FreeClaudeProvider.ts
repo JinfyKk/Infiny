@@ -39,6 +39,10 @@ export class FreeClaudeProvider implements AIProvider {
   // Fila de operações para evitar start/stop concorrentes
   private _opQueue: Promise<void> = Promise.resolve()
 
+  // Lock para evitar spawn concorrente de fcc-server (SINGLETON)
+  // Se já existe uma inicialização em andamento, aguarda a mesma Promise
+  private _fccServerInitPromise: Promise<void> | null = null
+
   constructor(_providerManager: ProviderManager) {
     console.log('[DEBUG] [FreeClaudeProvider] constructor called')
     // O providerManager não é mais usado diretamente
@@ -184,9 +188,31 @@ export class FreeClaudeProvider implements AIProvider {
    * 5. Emite healthyCallback
    *
    * NUNCA spawnar outro enquanto um saudável existir.
+   *
+   * PROTEÇÃO CONTRA RACE CONDITION:
+   * Se já existe uma inicialização em andamento (_fccServerInitPromise),
+   * aguarda essa Promise em vez de iniciar outra.
    */
   private async ensureFccServerRunning(): Promise<void> {
     const pm = this.processManager!
+
+    // LOCK: Se já existe inicialização em andamento, aguardar a mesma Promise
+    // Isso evita que duas chamadas concorrentes passem pelo check de isRunning/isHealthy
+    // e ambas tentem fazer spawn do fcc-server
+    if (this._fccServerInitPromise) {
+      console.log('[FCC LOCK] Waiting existing initialization...')
+      await this._fccServerInitPromise
+      console.log('[FCC LOCK] Existing initialization completed')
+      // Após aguardar, verificar novamente se ficou saudável
+      if (pm.isRunning('fcc-server') && await pm.isHealthy('fcc-server')) {
+        console.log('[FCC LOCK] Server healthy after waiting existing init')
+        this.healthyCallback?.()
+        return
+      }
+      // Se não ficou saudável, prosseguir para spawn (cai no fluxo normal abaixo)
+      console.log('[FCC LOCK] Previous init did not result in healthy server, proceeding...')
+    }
+
     console.log('[FCC] Checking existing fcc-server...')
 
     // 1. Verificar se processo existe no ProcessManager
@@ -196,9 +222,8 @@ export class FreeClaudeProvider implements AIProvider {
       // 2. Verificar saúde via ProcessManager.isHealthy()
       const isHealthy = await pm.isHealthy('fcc-server')
       if (isHealthy) {
-        console.log('[FCC] Existing healthy server found')
-        console.log('[FCC] Reusing existing server')
-        console.log('[FCC] Skip spawn')
+        console.log('[FCC SINGLETON] Reusing existing server')
+        console.log('[FCC SINGLETON] Skip spawn')
         this.healthyCallback?.()
         return
       }
@@ -209,10 +234,19 @@ export class FreeClaudeProvider implements AIProvider {
     }
 
     // 3. Spawn novo servidor (para primeira vez ou unhealthy)
-    await this.spawnFccServerInternal()
+    // Criar Promise de inicialização ANTES de iniciar, para que chamadas concorrentes
+    // possam aguardar esta mesma Promise
+    this._fccServerInitPromise = (async () => {
+      try {
+        await this.spawnFccServerInternal()
+        await this.waitForServerHealthy()
+      } finally {
+        // Limpar a Promise após concluir (sucesso ou falha)
+        this._fccServerInitPromise = null
+      }
+    })()
 
-    // 4. Aguardar health check
-    await this.waitForServerHealthy()
+    await this._fccServerInitPromise
 
     // 5. Emitir evento de servidor saudável
     this.healthyCallback?.()
@@ -652,6 +686,9 @@ export class FreeClaudeProvider implements AIProvider {
       } catch (error) {
         console.error('[FreeClaudeProvider] Error stopping:', error)
       }
+
+      // Limpar lock de inicialização do fcc-server se houver um em andamento
+      this._fccServerInitPromise = null
 
       this.cleanupProcessManagerListeners()
       this.config = null
