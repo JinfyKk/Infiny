@@ -86,7 +86,7 @@ const electronAPI = {
     ipcRenderer.invoke('start-provider', projectPath, config, source),
   sendToProvider: (chatId: string, message: string, images?: string[]): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('send-to-provider', chatId, message, images),
-  stopProvider: (): Promise<{ success: boolean }> => ipcRenderer.invoke('stop-provider'),
+  stopProvider: (chatId: string): Promise<{ success: boolean }> => ipcRenderer.invoke('stop-provider', chatId),
   restartProvider: (): Promise<StartProviderResult> => ipcRenderer.invoke('restart-provider'),
   getProviderConfig: (): Promise<{ providerId: string; config: ProviderConfig }> =>
     ipcRenderer.invoke('get-provider-config'),
@@ -113,14 +113,14 @@ const electronAPI = {
   windowClose: (): void => ipcRenderer.send('window-close'),
 
   // ---------- Eventos do Provider (stream de output do Claude CLI) ----------
-  onProviderOutput: createListener<string>('provider-output'),
-  onProviderError: createListener<string>('provider-error'),
-  onProviderExit: createListener<number>('provider-exit'),
+  onProviderOutput: createListener<{ chatId: string; content: string }>('provider-output'),
+  onProviderError: createListener<{ chatId: string; error: string }>('provider-error'),
+  onProviderExit: createListener<{ chatId: string; code: number }>('provider-exit'),
   onProviderReady: createListener<{ providerId: string }>('provider-ready'),
   onProviderHealthy: createListener<Record<string, never>>('provider-healthy'),
   onProviderStarted: createListener<{ providerId: string }>('provider-started'),
   onProviderStopped: createListener<{ providerId: string }>('provider-stopped'),
-  onProviderResponseComplete: createListener<Record<string, never>>('provider-response-complete'),
+  onProviderResponseComplete: createListener<{ chatId: string }>('provider-response-complete'),
 
   // ---------- Eventos de processos (fcc-server / claude) ----------
   onProcessStatus: createListener<{ processName: string; status: string; details?: string }>('process-status'),

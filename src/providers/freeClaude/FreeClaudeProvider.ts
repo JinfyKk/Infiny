@@ -506,8 +506,8 @@ export class FreeClaudeProvider implements AIProvider {
   /**
    * Envia mensagem para o Claude CLI via ProcessManager → stdin.
    */
-  async send(message: string, images?: string[]): Promise<void> {
-    console.log('[FreeClaudeProvider] [Pipeline] send() START', { messageLength: message.length, imagesCount: images?.length || 0 })
+  async send(chatId: string, message: string, images?: string[]): Promise<void> {
+    console.log('[FreeClaudeProvider] [Pipeline] send() START', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
     const pm = this.processManager!
     if (!pm.isRunning('claude')) {
       console.error('[FreeClaudeProvider] [Pipeline] send() FAILED: No active claude process or stdin not writable')

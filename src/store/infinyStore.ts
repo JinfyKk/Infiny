@@ -35,6 +35,7 @@ export interface Chat {
   updatedAt: number
   summary?: string
   importantInfo?: string
+  isGenerating?: boolean
 }
 
 export interface GeneratedFile {
@@ -64,8 +65,6 @@ interface InfinyState {
   currentProject: Project | null
   currentChat: Chat | null
   settings: Settings
-  isProviderRunning: boolean
-  providerOutput: string
   isSidebarOpen: boolean
   isFilesPanelOpen: boolean
   pendingImages: string[]
@@ -76,6 +75,7 @@ interface InfinyState {
   removeProject: (id: string) => void
   renameProject: (id: string, newName: string) => void
   setCurrentProject: (project: Project | null) => void
+  loadChatsForProject: (projectId: string, projectPath: string) => Promise<void>
   addChat: (chat: Omit<Chat, 'id' | 'createdAt' | 'updatedAt'>) => Chat
   updateChat: (id: string, updates: Partial<Chat>) => void
   removeChat: (id: string) => void
@@ -84,15 +84,12 @@ interface InfinyState {
   addMessage: (chatId: string, message: Omit<ChatMessage, 'id'>) => void
   updateMessage: (chatId: string, messageId: string, updates: Partial<ChatMessage>) => void
   updateSettings: (settings: Partial<Settings>) => void
-  setProviderRunning: (running: boolean) => void
-  appendProviderOutput: (output: string) => void
-  clearProviderOutput: () => void
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   toggleFilesPanel: () => void
   setFilesPanelOpen: (open: boolean) => void
   sendToProvider: (chatId: string, message: string, images?: string[]) => Promise<void>
-  stopProvider: () => void
+  stopProvider: (chatId: string) => void
   addPendingImage: (base64: string) => void
   removePendingImage: (index: number) => void
   clearPendingImages: () => void
@@ -107,8 +104,9 @@ interface InfinyState {
   _setupElectronListeners: () => void
   _cleanupElectronListeners: () => void
 
-  // Load chats from main process for a project
-  loadChatsForProject: (projectId: string, projectPath: string) => Promise<void>
+  // Selectors for per-chat streaming state
+  isChatGenerating: (chatId: string) => boolean
+  setChatGenerating: (chatId: string, generating: boolean) => void
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -124,16 +122,6 @@ let outputCleanup: (() => void) | null = null
 let errorCleanup: (() => void) | null = null
 let exitCleanup: (() => void) | null = null
 let responseCompleteCleanup: (() => void) | null = null
-
-// BUG C (defesa em profundidade no renderer):
-// `isProviderRunning` só vira `true` DEPOIS que startProvider() resolve.
-// Se sendToProvider() for chamado concorrentemente (ex.: duplo clique no
-// botão de enviar, Enter disparando 2x antes do primeiro processar), cada
-// chamada lê `isProviderRunning: false` e, sem este mutex, cada uma
-// dispararia sua PRÓPRIA chamada startProvider() — múltiplas chamadas
-// concorrentes de setActiveProvider no main process. O main process agora
-// serializa e deduplica isso (ver Provider.ts), mas mantemos esta trava
-// aqui também para não depender só da camada main.
 let providerStartPromise: Promise<void> | null = null
 
 export const useStore = create<InfinyState>()(
@@ -145,8 +133,6 @@ export const useStore = create<InfinyState>()(
       currentProject: null,
       currentChat: null,
       settings: DEFAULT_SETTINGS,
-      isProviderRunning: false,
-      providerOutput: '',
       isSidebarOpen: true,
       isFilesPanelOpen: false,
       pendingImages: [],
@@ -182,11 +168,21 @@ export const useStore = create<InfinyState>()(
       },
 
       setCurrentProject: (project) => {
+        console.log('[Store][BUG4] setCurrentProject called', {
+          projectId: project?.id,
+          projectName: project?.name,
+          currentProjectBefore: get().currentProject?.name,
+          currentChatBefore: get().currentChat?.title,
+          chatsCount: get().chats.length,
+        })
         set({ currentProject: project })
         if (project) {
-          // Load chats from main process for this project
           get().loadChatsForProject(project.id, project.path)
         }
+        console.log('[Store][BUG4] setCurrentProject completed', {
+          currentProjectAfter: get().currentProject?.name,
+          currentChatAfter: get().currentChat?.title,
+        })
       },
 
       addChat: (chat) => {
@@ -232,9 +228,20 @@ export const useStore = create<InfinyState>()(
       },
 
       setCurrentChat: (chat) => {
+        console.log('[Store][BUG4] setCurrentChat called', {
+          chatId: chat?.id,
+          chatTitle: chat?.title,
+          chatProjectId: chat?.projectId,
+          currentProjectBefore: get().currentProject?.name,
+          currentChatBefore: get().currentChat?.title,
+        })
         set({ currentChat: chat })
         // Configurar listeners do provider quando muda o chat
         get()._setupElectronListeners()
+        console.log('[Store][BUG4] setCurrentChat completed', {
+          currentChatAfter: get().currentChat?.title,
+          currentProjectAfter: get().currentProject?.name,
+        })
       },
 
       addMessage: (chatId, message) => {
@@ -250,6 +257,7 @@ export const useStore = create<InfinyState>()(
       },
 
       updateMessage: (chatId, messageId, updates) => {
+        console.log('[Store][BUG2] updateMessage called', { chatId, messageId, updatesKeys: Object.keys(updates) })
         set((state) => ({
           chats: state.chats.map((c) =>
             c.id === chatId
@@ -272,16 +280,22 @@ export const useStore = create<InfinyState>()(
         }
       },
 
-      setProviderRunning: (running) => {
-        set({ isProviderRunning: running })
+      // Per-chat streaming state selectors
+      isChatGenerating: (chatId: string) => {
+        const chat = get().chats.find((c) => c.id === chatId)
+        return chat?.isGenerating === true
       },
 
-      appendProviderOutput: (output) => {
-        set((state) => ({ providerOutput: state.providerOutput + output }))
-      },
-
-      clearProviderOutput: () => {
-        set({ providerOutput: '' })
+      setChatGenerating: (chatId: string, generating: boolean) => {
+        console.log('[Store][BUG3] setChatGenerating called', { chatId, generating })
+        set((state) => ({
+          chats: state.chats.map((c) =>
+            c.id === chatId ? { ...c, isGenerating: generating, updatedAt: Date.now() } : c
+          ),
+          currentChat: state.currentChat?.id === chatId
+            ? { ...state.currentChat, isGenerating: generating, updatedAt: Date.now() }
+            : state.currentChat,
+        }))
       },
 
       toggleSidebar: () => {
@@ -304,7 +318,7 @@ export const useStore = create<InfinyState>()(
         const state = get()
         const { currentProject, settings } = state
 
-        console.log('[Renderer] [Pipeline] sendToProvider CALLED', { chatId, messageLength: message.length, imagesCount: images.length, isProviderRunning: state.isProviderRunning })
+        console.log('[Renderer] [Pipeline] sendToProvider CALLED', { chatId, messageLength: message.length, imagesCount: images.length, isChatGenerating: state.isChatGenerating(chatId) })
 
         if (!currentProject) {
           console.error('[Renderer] [Pipeline] sendToProvider FAILED: No current project')
@@ -356,7 +370,8 @@ export const useStore = create<InfinyState>()(
         // Enviar mensagem
         try {
           console.log('[Renderer] [Pipeline] sendToProvider - Sending message via IPC')
-          set({ isProviderRunning: true, providerOutput: '' })
+          // Marcar chat como gerando
+          get().setChatGenerating(chatId, true)
 
           const assistantMessage: ChatMessage = {
             id: generateId(),
@@ -376,13 +391,13 @@ export const useStore = create<InfinyState>()(
               : state.currentChat,
           }))
 
-          // Enviar para o provider via IPC
+          // Enviar para o provider via IPC (inclui chatId)
           console.log('[Renderer] [Pipeline] sendToProvider - Calling electronAPI.sendToProvider')
           await window.electronAPI?.sendToProvider(chatId, message, images)
           console.log('[Renderer] [Pipeline] sendToProvider - IPC call completed')
         } catch (error) {
           console.error('[Renderer] [Pipeline] sendToProvider - Error sending message:', error)
-          set({ isProviderRunning: false })
+          get().setChatGenerating(chatId, false)
 
           // Remover mensagem de streaming em caso de erro
           if (assistantMessageId) {
@@ -400,9 +415,9 @@ export const useStore = create<InfinyState>()(
         }
       },
 
-      stopProvider: () => {
-        window.electronAPI?.stopProvider()
-        set({ isProviderRunning: false })
+      stopProvider: (chatId: string) => {
+        window.electronAPI?.stopProvider(chatId)
+        get().setChatGenerating(chatId, false)
       },
 
       addPendingImage: (base64) => {
@@ -497,6 +512,17 @@ export const useStore = create<InfinyState>()(
 
             set((state) => ({ chats: [...state.chats, newChat], currentChat: newChat }))
             get().setCurrentChat(newChat)
+          } else {
+            // No history - create a new empty chat (BUG 4 fix)
+            console.log('[Store][BUG4] No history for project, creating new empty chat')
+            const newChat = get().addChat({
+              projectId,
+              title: 'Nova conversa',
+              messages: [],
+              summary: '',
+              importantInfo: '',
+            })
+            get().setCurrentChat(newChat)
           }
         } catch (error) {
           console.error('[Store] Failed to load chats for project:', error)
@@ -504,45 +530,55 @@ export const useStore = create<InfinyState>()(
       },
 
       _setupElectronListeners: () => {
+        console.log('[Renderer] [Pipeline] _setupElectronListeners called')
         // Limpar listeners anteriores
         get()._cleanupElectronListeners()
 
-        // Listener para saída do provider (streaming)
-        outputCleanup = window.electronAPI?.onProviderOutput((data: string) => {
-          console.log('[Renderer] [Pipeline] onProviderOutput RECEIVED', { dataLength: data.length, dataPreview: data.slice(0, 100) })
-          get().appendProviderOutput(data)
-
-          // Atualizar a mensagem de streaming
-          const currentChat = get().currentChat
-          if (currentChat) {
-            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+        // Listener para saída do provider (streaming) - agora recebe chatId
+        outputCleanup = window.electronAPI?.onProviderOutput((data: { chatId: string; content: string }) => {
+          console.log('[Renderer] [Pipeline] onProviderOutput RECEIVED', { chatId: data.chatId, contentLength: data.content.length })
+          const state = get()
+          const chat = state.chats.find((c) => c.id === data.chatId)
+          if (chat) {
+            const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderOutput - Updating streaming message')
-              get().updateMessage(currentChat.id, lastMessage.id, {
-                content: lastMessage.content + data,
+              console.log('[Renderer] [Pipeline] onProviderOutput - Updating streaming message for chat', data.chatId)
+              get().updateMessage(data.chatId, lastMessage.id, {
+                content: lastMessage.content + data.content,
               })
             } else {
-              console.warn('[Renderer] [Pipeline] onProviderOutput - No streaming message to update, lastMessage:', lastMessage?.role, lastMessage?.isStreaming)
+              console.warn('[Renderer] [Pipeline] onProviderOutput - No streaming message to update for chat', data.chatId, 'lastMessage:', lastMessage?.role, lastMessage?.isStreaming)
             }
           }
         })
 
-        errorCleanup = window.electronAPI?.onProviderError((data: string) => {
+        errorCleanup = window.electronAPI?.onProviderError((data: { chatId: string; error: string }) => {
           console.error('[Renderer] [Pipeline] onProviderError RECEIVED:', data)
-          get().appendProviderOutput(`\n[Erro: ${data}]`)
+          // Append error to streaming message
+          const state = get()
+          const chat = state.chats.find((c) => c.id === data.chatId)
+          if (chat) {
+            const lastMessage = chat.messages[chat.messages.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+              get().updateMessage(data.chatId, lastMessage.id, {
+                content: lastMessage.content + `\n[Erro: ${data.error}]`,
+              })
+            }
+          }
         })
 
-        exitCleanup = window.electronAPI?.onProviderExit((code: number) => {
-          console.log('[Renderer] [Pipeline] onProviderExit RECEIVED, code:', code)
-          set({ isProviderRunning: false })
+        exitCleanup = window.electronAPI?.onProviderExit((data: { chatId: string; code: number }) => {
+          console.log('[Renderer] [Pipeline] onProviderExit RECEIVED, chatId:', data.chatId, 'code:', data.code)
+          get().setChatGenerating(data.chatId, false)
 
           // Finalizar mensagem de streaming
-          const currentChat = get().currentChat
-          if (currentChat) {
-            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+          const state = get()
+          const chat = state.chats.find((c) => c.id === data.chatId)
+          if (chat) {
+            const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderExit - Finalizing streaming message')
-              get().updateMessage(currentChat.id, lastMessage.id, {
+              console.log('[Renderer] [Pipeline] onProviderExit - Finalizing streaming message for chat', data.chatId)
+              get().updateMessage(data.chatId, lastMessage.id, {
                 isStreaming: false,
               })
             }
@@ -550,17 +586,18 @@ export const useStore = create<InfinyState>()(
         })
 
         // Listener para fim de resposta (quando provider emite 'result' type)
-        responseCompleteCleanup = window.electronAPI?.onProviderResponseComplete(() => {
-          console.log('[Renderer] [Pipeline] onProviderResponseComplete RECEIVED')
-          set({ isProviderRunning: false })
+        responseCompleteCleanup = window.electronAPI?.onProviderResponseComplete((data: { chatId: string }) => {
+          console.log('[Renderer] [Pipeline] onProviderResponseComplete RECEIVED, chatId:', data.chatId)
+          get().setChatGenerating(data.chatId, false)
 
           // Finalizar mensagem de streaming
-          const currentChat = get().currentChat
-          if (currentChat) {
-            const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+          const state = get()
+          const chat = state.chats.find((c) => c.id === data.chatId)
+          if (chat) {
+            const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderResponseComplete - Finalizing streaming message')
-              get().updateMessage(currentChat.id, lastMessage.id, {
+              console.log('[Renderer] [Pipeline] onProviderResponseComplete - Finalizing streaming message for chat', data.chatId)
+              get().updateMessage(data.chatId, lastMessage.id, {
                 isStreaming: false,
               })
             }
@@ -569,6 +606,7 @@ export const useStore = create<InfinyState>()(
       },
 
       _cleanupElectronListeners: () => {
+        console.log('[Renderer] [Pipeline] _cleanupElectronListeners called')
         if (outputCleanup) outputCleanup()
         if (errorCleanup) errorCleanup()
         if (exitCleanup) exitCleanup()

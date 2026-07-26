@@ -62,6 +62,9 @@ const processStatusCache = new Map<string, { status: string; details?: string }>
 let providerHealthyFired = false
 let providerReadyFired = false
 
+// Track current chatId being streamed (for routing events to correct chat)
+let currentStreamingChatId: string | null = null
+
 // Configuração padrão do provedor ativo (persistida no config.json)
 let activeProviderId = 'free-claude' // Default para free-claude (sem login)
 let activeProviderConfig: ProviderConfig = {
@@ -247,21 +250,47 @@ function sendToRenderer(event: string, data: unknown) {
  */
 function setupProviderListeners(): void {
   providerManager.onData((data: string) => {
-    sendToRenderer('provider-output', data)
+    if (currentStreamingChatId) {
+      sendToRenderer('provider-output', { chatId: currentStreamingChatId, content: data })
+    } else {
+      // Fallback: send without chatId (backward compatibility)
+      sendToRenderer('provider-output', { chatId: '', content: data })
+    }
   })
 
   providerManager.onError((error: string) => {
-    sendToRenderer('provider-error', error)
+    if (currentStreamingChatId) {
+      sendToRenderer('provider-error', { chatId: currentStreamingChatId, error })
+    } else {
+      sendToRenderer('provider-error', { chatId: '', error })
+    }
   })
 
   providerManager.onExit((code: number) => {
-    sendToRenderer('provider-exit', code)
+    if (currentStreamingChatId) {
+      sendToRenderer('provider-exit', { chatId: currentStreamingChatId, code })
+      // Clear the streaming chatId when provider exits
+      currentStreamingChatId = null
+    } else {
+      sendToRenderer('provider-exit', { chatId: '', code })
+    }
   })
 
   providerManager.onReady(() => {
     console.log('[Main] [ProviderManager] provider-ready event received, forwarding to renderer')
     providerReadyFired = true
     sendToRenderer('provider-ready', { providerId: activeProviderId })
+  })
+
+  providerManager.onResponseComplete(() => {
+    console.log('[Main] [ProviderManager] provider-response-complete event received, forwarding to renderer')
+    if (currentStreamingChatId) {
+      sendToRenderer('provider-response-complete', { chatId: currentStreamingChatId })
+      // Clear the streaming chatId when response completes
+      currentStreamingChatId = null
+    } else {
+      sendToRenderer('provider-response-complete', { chatId: '' })
+    }
   })
 }
 
@@ -353,28 +382,31 @@ async function stopActiveProvider(): Promise<void> {
  * Envia mensagem para o provedor ativo.
  * SEMPRE delega para o Provider via ProviderManager (não escreve direto no ProcessManager).
  */
-async function sendToActiveProvider(message: string, images?: string[]): Promise<boolean> {
+async function sendToActiveProvider(chatId: string, message: string, images?: string[]): Promise<boolean> {
   try {
-    console.log('[Main] [Pipeline] sendToActiveProvider RECEIVED', { messageLength: message.length, imagesCount: images?.length || 0 })
+    console.log('[Main] [Pipeline] sendToActiveProvider RECEIVED', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
     const activeProvider = providerManager.getActiveProvider()
 
     if (!activeProvider) {
       console.error('[Main] [Pipeline] sendToActiveProvider FAILED: No active provider')
-      sendToRenderer('provider-error', 'Nenhum provedor ativo')
+      sendToRenderer('provider-error', { chatId, error: 'Nenhum provedor ativo' })
       return false
     }
 
     console.log('[Main] [Pipeline] sendToActiveProvider: Active provider is', activeProvider.getId())
 
+    // Set current streaming chatId for routing events
+    currentStreamingChatId = chatId
+
     // Delegar SEMPRE para o Provider via ProviderManager.send()
     // O Provider sabe como lidar com seu próprio transporte (ProcessManager, stdio, HTTP, etc.)
     console.log('[Main] [Pipeline] Calling providerManager.send()')
-    await providerManager.send(message, images)
+    await providerManager.send(chatId, message, images)
     console.log('[Main] [Pipeline] sendToActiveProvider SUCCESS')
     return true
   } catch (error: any) {
     console.error('[Main] [Pipeline] sendToActiveProvider ERROR:', error)
-    sendToRenderer('provider-error', `Erro ao enviar mensagem: ${error.message}`)
+    sendToRenderer('provider-error', { chatId, error: `Erro ao enviar mensagem: ${error.message}` })
     return false
   }
 }
@@ -495,9 +527,9 @@ ipcMain.handle('start-provider', async (_event, projectPath: string, config?: Pa
 /**
  * Envia mensagem para o provedor ativo.
  */
-ipcMain.handle('send-to-provider', async (_event, _chatId: string, message: string, images?: string[]) => {
-  console.log('[Main] [IPC] send-to-provider RECEIVED', { messageLength: message.length, imagesCount: images?.length || 0 })
-  const success = await sendToActiveProvider(message, images)
+ipcMain.handle('send-to-provider', async (_event, chatId: string, message: string, images?: string[]) => {
+  console.log('[Main] [IPC] send-to-provider RECEIVED', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
+  const success = await sendToActiveProvider(chatId, message, images)
   console.log('[Main] [IPC] send-to-provider COMPLETED', { success })
   return { success }
 })
@@ -505,7 +537,7 @@ ipcMain.handle('send-to-provider', async (_event, _chatId: string, message: stri
 /**
  * Para o provedor ativo.
  */
-ipcMain.handle('stop-provider', async () => {
+ipcMain.handle('stop-provider', async (_event, _chatId: string) => {
   await stopActiveProvider()
   return { success: true }
 })

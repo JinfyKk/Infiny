@@ -59,12 +59,28 @@ const providerLabels: Record<ProviderValue, string> = {
 }
 
 export function ProviderSelector() {
-  const { settings, updateSettings, isProviderRunning } = useStore()
+  const { settings, updateSettings, currentChat, isChatGenerating } = useStore()
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const shouldReduceMotion = useReducedMotion()
+
+  const chatId = currentChat?.id
+  const isGenerating = chatId ? isChatGenerating(chatId) : false
+
+  const updatePortalPosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPortalPosition({ top: rect.bottom + 6, left: rect.left })
+      console.log('[ProviderSelector][BUG1] Portal position calculated', {
+        triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+        portalPosition: { top: rect.bottom + 6, left: rect.left },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      })
+    }
+  }, [])
 
   const currentProvider = settings.provider as ProviderValue
   const currentProviderOption = PROVIDERS.find((p) => p.value === currentProvider) || PROVIDERS[0]
@@ -73,6 +89,31 @@ export function ProviderSelector() {
     const idx = PROVIDERS.findIndex((p) => p.value === currentProvider)
     setSelectedIndex(idx >= 0 ? idx : 0)
   }, [currentProvider])
+
+  // === DIAGNOSTIC LOGS - BUG 1 ===
+  const handleToggle = useCallback(() => {
+    if (!isGenerating) {
+      console.log('[ProviderSelector][BUG1] ▶▶▶ TOGGLE CALLED', {
+        isGenerating,
+        isOpenBefore: isOpen,
+        triggerRef: triggerRef.current ? 'exists' : 'null',
+        dropdownRef: dropdownRef.current ? 'exists' : 'null',
+      })
+      setIsOpen((prev) => {
+        const next = !prev
+        console.log('[ProviderSelector][BUG1] ▶▶▶ ISOPEN CHANGED', { before: prev, after: next })
+        if (next && triggerRef.current) {
+          const rect = triggerRef.current.getBoundingClientRect()
+          console.log('[ProviderSelector][BUG1] Portal position', {
+            triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+            expectedTop: rect.bottom + 6,
+            expectedLeft: rect.left,
+          })
+        }
+        return next
+      })
+    }
+  }, [isGenerating, isOpen])
 
   const handleSelect = useCallback(
     async (providerValue: string) => {
@@ -90,26 +131,53 @@ export function ProviderSelector() {
 
   // Click outside to close
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let listenerAttached = false
+
     function handleClickOutside(event: MouseEvent | TouchEvent) {
+      console.log('[ProviderSelector][BUG1] 🎯 CLICK OUTSIDE HANDLER FIRED', {
+        eventType: event.type,
+        target: event.target,
+        targetTag: (event.target as Element)?.tagName,
+        targetId: (event.target as Element)?.id,
+        targetClass: (event.target as HTMLElement)?.className,
+        composedPath: event.composedPath?.().map((el: any) => el.tagName || el.nodeName).slice(0, 8),
+        triggerRef: triggerRef.current ? 'exists' : 'null',
+        dropdownRef: dropdownRef.current ? 'exists' : 'null',
+        triggerContains: triggerRef.current?.contains(event.target as Node),
+        dropdownContains: dropdownRef.current?.contains(event.target as Node),
+        listenerAttached,
+        isOpen,
+      })
+
       if (
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node) &&
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
+        console.log('[ProviderSelector][BUG1] ✅ CLOSING DROPDOWN via click outside')
         setIsOpen(false)
+      } else {
+        console.log('[ProviderSelector][BUG1] ❌ IGNORING CLICK (inside trigger or dropdown)')
       }
     }
 
     if (isOpen) {
-      const timer = setTimeout(() => {
+      console.log('[ProviderSelector][BUG1] 📝 REGISTERING CLICK OUTSIDE LISTENER (setTimeout 0)')
+      timer = setTimeout(() => {
+        listenerAttached = true
+        console.log('[ProviderSelector][BUG1] 📝 LISTENER ACTUALLY ATTACHED NOW')
         document.addEventListener('mousedown', handleClickOutside)
         document.addEventListener('touchstart', handleClickOutside, { passive: true })
       }, 0)
       return () => {
-        clearTimeout(timer)
-        document.removeEventListener('mousedown', handleClickOutside)
-        document.removeEventListener('touchstart', handleClickOutside)
+        clearTimeout(timer!)
+        if (listenerAttached) {
+          console.log('[ProviderSelector][BUG1] 🧹 CLEANUP: removing listeners')
+          document.removeEventListener('mousedown', handleClickOutside)
+          document.removeEventListener('touchstart', handleClickOutside)
+        }
       }
     }
   }, [isOpen])
@@ -159,17 +227,25 @@ export function ProviderSelector() {
   }, [isOpen])
 
   const portalContent = isOpen ? (
-    <motion.div
-      ref={dropdownRef}
-      variants={dropdownVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      transition={shouldReduceMotion ? { duration: 0 } : undefined}
-      className={cn('fixed z-50 mt-1.5 min-w-[200px] max-h-[300px]')}
-      role="menu"
-      style={{ pointerEvents: 'auto' }}
-    >
+    <>
+      {triggerRef.current && (() => {
+        updatePortalPosition()
+        return null
+      })()}
+      <motion.div
+        ref={dropdownRef}
+        variants={dropdownVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        transition={shouldReduceMotion ? { duration: 0 } : undefined}
+        className={cn('fixed z-50 min-w-[200px] max-h-[300px]')}
+        role="menu"
+        style={{
+          pointerEvents: 'auto',
+          ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
+        }}
+      >
       <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">
         <div className="px-3 py-2 border-b border-glassBorder bg-surface/50">
           <span className="text-xs font-semibold text-textMuted uppercase tracking-wider">Provedor</span>
@@ -186,8 +262,8 @@ export function ProviderSelector() {
             <motion.button
               key={option.value}
               role="menuitem"
-              disabled={option.disabled || isProviderRunning}
-              onClick={() => !option.disabled && !isProviderRunning && handleSelect(option.value)}
+              disabled={option.disabled || isGenerating}
+              onClick={() => !option.disabled && !isGenerating && handleSelect(option.value)}
               onMouseEnter={() => setSelectedIndex(idx)}
               variants={dropdownItemVariants}
               whileHover={{ x: 4, transition: transitions.snappy }}
@@ -223,18 +299,19 @@ export function ProviderSelector() {
         </motion.div>
       </div>
     </motion.div>
-  ) : null
+  </>
+) : null
 
   return (
     <div className="relative">
       <button
         ref={triggerRef}
-        onClick={() => !isProviderRunning && setIsOpen(!isOpen)}
-        disabled={isProviderRunning}
+        onClick={handleToggle}
+        disabled={isGenerating}
         className={cn(
           'inline-flex items-center gap-2 h-9 px-3 rounded-lg border transition-colors duration-150',
           'font-medium text-sm',
-          isProviderRunning
+          isGenerating
             ? 'opacity-50 cursor-not-allowed bg-surface border-border text-textMuted'
             : isOpen
             ? 'bg-primary/10 border-primary text-primary'
@@ -243,7 +320,7 @@ export function ProviderSelector() {
         )}
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-disabled={isProviderRunning}
+        aria-disabled={isGenerating}
         aria-label={`Provedor atual: ${providerLabels[currentProvider]}`}
       >
         <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0">

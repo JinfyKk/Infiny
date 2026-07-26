@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Palette, Sun, Moon, Monitor, Zap, Circle as LucideCircle, TreePine } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -19,13 +19,44 @@ export function ThemeSelector() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number } | null>(null)
   const [hoveredTheme, setHoveredTheme] = useState<ThemeName | null>(null)
   const shouldReduceMotion = useReducedMotion()
+
+  const updatePortalPosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPortalPosition({ top: rect.bottom + 6, left: rect.left })
+      console.log('[ThemeSelector][BUG1] Portal position calculated', {
+        triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+        portalPosition: { top: rect.bottom + 6, left: rect.left },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      })
+    }
+  }, [])
 
   const currentThemeLabel = themeLabels[theme]
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let listenerAttached = false
+
     function handleClickOutside(event: MouseEvent) {
+      console.log('[ThemeSelector][BUG1] 🎯 CLICK OUTSIDE HANDLER FIRED', {
+        eventType: event.type,
+        target: event.target,
+        targetTag: (event.target as Element)?.tagName,
+        targetId: (event.target as Element)?.id,
+        targetClass: (event.target as HTMLElement)?.className,
+        composedPath: event.composedPath?.().map((el: any) => el.tagName || el.nodeName).slice(0, 8),
+        triggerRef: triggerRef.current ? 'exists' : 'null',
+        dropdownRef: dropdownRef.current ? 'exists' : 'null',
+        triggerContains: triggerRef.current?.contains(event.target as Node),
+        dropdownContains: dropdownRef.current?.contains(event.target as Node),
+        listenerAttached,
+        isOpen,
+      })
+
       if (
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node) &&
@@ -33,26 +64,56 @@ export function ThemeSelector() {
         !dropdownRef.current.contains(event.target as Node) &&
         !event.composedPath().includes(triggerRef.current)
       ) {
+        console.log('[ThemeSelector][BUG1] ✅ CLOSING DROPDOWN via click outside')
         setIsOpen(false)
+      } else {
+        console.log('[ThemeSelector][BUG1] ❌ IGNORING CLICK (inside trigger or dropdown)')
       }
     }
 
     if (isOpen) {
-      // Use setTimeout to avoid race condition between click and mousedown
-      const timer = setTimeout(() => {
+      console.log('[ThemeSelector][BUG1] 📝 REGISTERING CLICK OUTSIDE LISTENER (setTimeout 0)')
+      timer = setTimeout(() => {
+        listenerAttached = true
+        console.log('[ThemeSelector][BUG1] 📝 LISTENER ACTUALLY ATTACHED NOW')
         document.addEventListener('mousedown', handleClickOutside)
       }, 0)
       return () => {
-        clearTimeout(timer)
-        document.removeEventListener('mousedown', handleClickOutside)
+        clearTimeout(timer!)
+        if (listenerAttached) {
+          console.log('[ThemeSelector][BUG1] 🧹 CLEANUP: removing listener')
+          document.removeEventListener('mousedown', handleClickOutside)
+        }
       }
     }
   }, [isOpen])
 
-  const handleSelectTheme = (newTheme: ThemeName) => {
+  // === DIAGNOSTIC LOGS - BUG 1 ===
+  const handleToggle = useCallback(() => {
+    console.log('[ThemeSelector][BUG1] ▶▶▶ TOGGLE CALLED', {
+      isOpenBefore: isOpen,
+      triggerRef: triggerRef.current ? 'exists' : 'null',
+      dropdownRef: dropdownRef.current ? 'exists' : 'null',
+    })
+    setIsOpen((prev) => {
+      const next = !prev
+      console.log('[ThemeSelector][BUG1] ▶▶▶ ISOPEN CHANGED', { before: prev, after: next })
+      if (next && triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect()
+        console.log('[ThemeSelector][BUG1] Portal position', {
+          triggerRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+          expectedTop: rect.bottom + 6,
+          expectedLeft: rect.left,
+        })
+      }
+      return next
+    })
+  }, [isOpen])
+
+  const handleSelectTheme = useCallback((newTheme: ThemeName) => {
     setTheme(newTheme)
     setIsOpen(false)
-  }
+  }, [setTheme])
 
   const themeOptions = availableThemes.map((themeId) => {
     const isActive = theme === themeId
@@ -67,16 +128,25 @@ export function ThemeSelector() {
   })
 
   const portalContent = isOpen ? (
-    <motion.div
-      ref={dropdownRef}
-      variants={dropdownVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className="fixed z-50 mt-1.5 min-w-[220px]"
-      role="menu"
-      transition={shouldReduceMotion ? { duration: 0 } : undefined}
-    >
+    <>
+      {triggerRef.current && (() => {
+        updatePortalPosition()
+        return null
+      })()}
+      <motion.div
+        ref={dropdownRef}
+        variants={dropdownVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="fixed z-50 min-w-[220px]"
+        role="menu"
+        transition={shouldReduceMotion ? { duration: 0 } : undefined}
+        style={{
+          pointerEvents: 'auto',
+          ...(portalPosition ? { top: portalPosition.top, left: portalPosition.left } : {}),
+        }}
+      >
       <div className="glass rounded-xl border border-glassBorder shadow-xl overflow-hidden">
         <div className="px-3 py-2 border-b border-glassBorder bg-surface/50">
           <span className="text-xs font-semibold text-textMuted uppercase tracking-wider">Tema</span>
@@ -119,13 +189,14 @@ export function ThemeSelector() {
         </motion.div>
       </div>
     </motion.div>
-  ) : null
+  </>
+) : null
 
   return (
     <div className="relative">
       <button
         ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={cn(
           'inline-flex items-center gap-2 h-9 px-3 rounded-lg border transition-colors duration-150',
           'font-medium text-sm',

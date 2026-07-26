@@ -127,7 +127,7 @@ export class ClaudeProvider implements AIProvider {
     })
   }
 
-  async send(message: string, images?: string[]): Promise<void> {
+  async send(_chatId: string, message: string, images?: string[]): Promise<void> {
     if (!this.process || !this.process.stdin?.writable) {
       console.error('[ClaudeProvider] No active process or stdin not writable')
       throw new Error('Processo Claude não está rodando')

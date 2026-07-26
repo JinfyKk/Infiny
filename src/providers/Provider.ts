@@ -63,7 +63,7 @@ export interface AIProvider {
    * Envia uma mensagem para o provider.
    * Deve suportar streaming de resposta via callbacks onData/onError/onExit.
    */
-  send(message: string, images?: string[]): Promise<void>
+  send(chatId: string, message: string, images?: string[]): Promise<void>
 
   /**
    * Para o provider graciosamente.
@@ -394,8 +394,8 @@ export class ProviderManager {
   /**
    * Envia mensagem para o provider ativo.
    */
-  async send(message: string, images?: string[]): Promise<void> {
-    console.log('[ProviderManager] send() - START, provider:', this.activeProvider?.getId())
+  async send(chatId: string, message: string, images?: string[]): Promise<void> {
+    console.log('[ProviderManager] send() - START, provider:', this.activeProvider?.getId(), 'chatId:', chatId)
     if (!this.activeProvider) {
       throw new Error('Nenhum provider ativo. Selecione um provider primeiro.')
     }
@@ -410,7 +410,7 @@ export class ProviderManager {
       this.setupProviderListeners()
     }
 
-    await this.activeProvider.send(message, images)
+    await this.activeProvider.send(chatId, message, images)
     console.log('[ProviderManager] send() - COMPLETED')
   }
 

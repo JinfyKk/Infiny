@@ -23,7 +23,6 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     currentChat,
     currentProject,
     settings,
-    isProviderRunning,
     pendingImages,
     addMessage,
     updateSettings,
@@ -32,11 +31,15 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     addPendingImage,
     removePendingImage,
     clearPendingImages,
+    isChatGenerating,
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [inputValue, setInputValue] = useState('')
   const [dragActive, setDragActive] = useState(false)
+
+  // Per-chat generating state
+  const isGenerating = currentChat ? isChatGenerating(currentChat.id) : false
 
   // Carregar modelos do provider ativo
   const loadModels = useCallback(async () => {
@@ -59,7 +62,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentChat?.messages, isProviderRunning])
+  }, [currentChat?.messages, isGenerating])
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
@@ -92,7 +95,9 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
   }
 
   const handleStop = () => {
-    stopProvider()
+    if (currentChat) {
+      stopProvider(currentChat.id)
+    }
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -373,8 +378,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={isProviderRunning ? 'IA está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
-              disabled={isProviderRunning}
+              placeholder={isGenerating ? 'IA está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
+              disabled={isGenerating}
               minRows={1}
               maxRows={8}
               className={cn(
@@ -393,14 +398,14 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
             className="flex items-center gap-1"
           >
             <Button
-              variant={isProviderRunning ? 'danger' : 'primary'}
+              variant={isGenerating ? 'danger' : 'primary'}
               size="icon"
-              onClick={isProviderRunning ? handleStop : handleSend}
-              disabled={(!inputValue.trim() && pendingImages.length === 0) || isProviderRunning}
-              aria-label={isProviderRunning ? 'Parar geração' : 'Enviar mensagem'}
+              onClick={isGenerating ? handleStop : handleSend}
+              disabled={(!inputValue.trim() && pendingImages.length === 0) || isGenerating}
+              aria-label={isGenerating ? 'Parar geração' : 'Enviar mensagem'}
               interactionType="icon-pulse"
             >
-              {isProviderRunning ? <StopCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+              {isGenerating ? <StopCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </Button>
           </motion.div>
         </motion.div>
