@@ -105,6 +105,26 @@ const renderers = {
   },
 }
 
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 py-1 px-0.5" role="status" aria-label="Pensando...">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="w-2 h-2 rounded-full bg-textMuted"
+          animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
+          transition={{
+            duration: 0.9,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: i * 0.15,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function Message({ message, isStreaming = false }: MessageProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
@@ -179,13 +199,17 @@ export function Message({ message, isStreaming = false }: MessageProps) {
             </motion.div>
           )}
 
-          <ReactMarkdown
-            components={renderers}
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-          >
-            {message.content}
-          </ReactMarkdown>
+          {streaming && !message.content ? (
+            <TypingIndicator />
+          ) : (
+            <ReactMarkdown
+              components={renderers}
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
         </motion.div>
       </div>
     </motion.div>

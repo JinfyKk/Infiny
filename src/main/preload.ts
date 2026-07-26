@@ -85,6 +85,9 @@ const electronAPI = {
   saveProject: (project: ProjectConfig): Promise<void> => ipcRenderer.invoke('save-project', project),
   deleteProject: (name: string): Promise<void> => ipcRenderer.invoke('delete-project', name),
 
+  // ---------- Sistema ----------
+  getHomeDir: (): Promise<string> => ipcRenderer.invoke('get-home-dir'),
+
   // ---------- Provider / Processos ----------
   getProcessStatusSnapshot: (): Promise<ProcessStatusSnapshot> =>
     ipcRenderer.invoke('get-process-status-snapshot'),

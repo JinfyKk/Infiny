@@ -342,8 +342,10 @@ export const useStore = create<InfinyState>()(
 
         // For independent chats, use a default working directory (user home)
         // For project chats, use the project path
+        // NOTE: `process` doesn't exist in the renderer — the home dir must be
+        // fetched from the main process (which does have Node's `process`/`os`).
         const projectPath = isIndependentChat
-          ? (process.env.USERPROFILE || process.env.HOME || process.cwd())
+          ? await window.electronAPI?.getHomeDir()
           : currentProject?.path
 
         console.log(`[SEND 04] [${timestamp}] [renderer] sendToProvider START`, {

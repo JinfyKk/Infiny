@@ -106,7 +106,7 @@ export function ModelSelector({
   // Find current model for display
   const currentModel = models.find((m) => m.value === localModel) || {
     value: localModel,
-    label: localModel,
+    label: localModel || placeholder,
     description: '',
   }
 
@@ -156,6 +156,7 @@ export function ModelSelector({
     value: model.value,
     label: model.label,
     description: model.description,
+    provider: model.provider,
     isActive: localModel === model.value,
     isHovered: hoveredModel === model.value,
   }))

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'fs'
+import { homedir } from 'os'
 import { providerManager, ProviderConfig } from '../providers/Provider'
 import { ClaudeProvider } from '../providers/claude/ClaudeProvider'
 import { FreeClaudeProvider } from '../providers/freeClaude/FreeClaudeProvider'
@@ -422,6 +423,8 @@ async function sendToActiveProvider(chatId: string, message: string, images?: st
 // ============================================
 // IPC HANDLERS - PROJECTS
 // ============================================
+
+ipcMain.handle('get-home-dir', () => homedir())
 
 ipcMain.handle('get-projects', () => getProjects())
 
