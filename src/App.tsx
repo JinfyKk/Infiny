@@ -21,12 +21,22 @@ const fadeInUp = {
 } as const
 
 function AppContent() {
-  const { isSidebarOpen, setSidebarOpen, isFilesPanelOpen, setFilesPanelOpen, currentProject, currentChat, settings, completeOnboarding } = useStore()
+  const { isSidebarOpen, setSidebarOpen, isFilesPanelOpen, setFilesPanelOpen, currentProject, currentChat, settings, completeOnboarding, _setupElectronListeners } = useStore()
   const [mounted, setMounted] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showSplash, setShowSplash] = useState(true)
 
   useSidebarShortcut()
+
+  // Inicializa listeners do Electron (IPC do main process pro renderer)
+  // Isso conecta os eventos do provider (stream de resposta, erros, fim de resposta) ao store
+  useEffect(() => {
+    _setupElectronListeners()
+    return () => {
+      const { _cleanupElectronListeners } = useStore.getState()
+      _cleanupElectronListeners()
+    }
+  }, [_setupElectronListeners])
 
   useEffect(() => {
     setMounted(true)
