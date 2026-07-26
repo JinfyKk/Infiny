@@ -110,6 +110,16 @@ export function Message({ message, isStreaming = false }: MessageProps) {
   const isAssistant = message.role === 'assistant'
   const streaming = isStreaming || message.isStreaming
 
+  const timestamp = new Date().toISOString()
+  console.log(`[SEND 33] [${timestamp}] [renderer] Message RENDER`, {
+    messageId: message.id,
+    role: message.role,
+    contentLength: message.content.length,
+    streaming,
+    isStreamingProp: isStreaming,
+    messageIsStreaming: message.isStreaming
+  })
+
   return (
     <motion.div
       variants={streaming ? chatMessageStreamingVariants : chatMessageVariants}

@@ -332,10 +332,22 @@ export const useStore = create<InfinyState>()(
         const state = get()
         const { currentProject, settings } = state
 
-        console.log('[Renderer] [Pipeline] sendToProvider CALLED', { chatId, messageLength: message.length, imagesCount: images.length, isChatGenerating: state.isChatGenerating(chatId) })
+        const timestamp = new Date().toISOString()
+        const providerId = settings.provider
+        const model = settings.model
+        const projectPath = currentProject?.path
+        console.log(`[SEND 04] [${timestamp}] [renderer] sendToProvider START`, {
+          chatId,
+          providerId,
+          model,
+          projectPath,
+          messageLength: message.length,
+          imagesCount: images.length,
+          isChatGenerating: state.isChatGenerating(chatId),
+        })
 
         if (!currentProject) {
-          console.error('[Renderer] [Pipeline] sendToProvider FAILED: No current project')
+          console.error(`[SEND 04] [${timestamp}] [renderer] sendToProvider FAILED: No current project`)
           return
         }
 
@@ -348,7 +360,12 @@ export const useStore = create<InfinyState>()(
         let myStartPromise: Promise<void> | null = null
         try {
           if (!providerStartPromise) {
-            console.log('[Renderer] [Pipeline] sendToProvider - Starting/ensuring provider for project:', currentProject.path, { model: settings.model, effort: settings.effort, webSearch: settings.webSearch })
+            console.log(`[SEND 05] [${timestamp}] [renderer] Starting/ensuring provider for project`, {
+              projectPath: currentProject.path,
+              model: settings.model,
+              effort: settings.effort,
+              webSearch: settings.webSearch,
+            })
             myStartPromise = (async () => {
               await window.electronAPI?.startProvider(
                 currentProject.path,
@@ -359,18 +376,18 @@ export const useStore = create<InfinyState>()(
                 },
                 'renderer:infinyStore.sendToProvider'
               )
-              console.log('[Renderer] [Pipeline] sendToProvider - startProvider returned, waiting 500ms')
+              console.log(`[SEND 05b] [${timestamp}] [renderer] startProvider returned, waiting 500ms`)
               // Aguardar um pouco para o provider iniciar
               await new Promise((resolve) => setTimeout(resolve, 500))
             })()
             providerStartPromise = myStartPromise
           } else {
-            console.log('[Renderer] [Pipeline] sendToProvider - reusing in-flight startProvider call')
+            console.log(`[SEND 05] [${timestamp}] [renderer] Reusing in-flight startProvider call`)
           }
 
           await providerStartPromise
         } catch (error) {
-          console.error('[Renderer] [Pipeline] sendToProvider - Error starting provider:', error)
+          console.error(`[SEND 05] [${timestamp}] [renderer] Error starting provider:`, error)
           return
         } finally {
           // Só limpa o mutex se ainda apontar para a promise que ESTA
@@ -383,7 +400,7 @@ export const useStore = create<InfinyState>()(
 
         // Enviar mensagem
         try {
-          console.log('[Renderer] [Pipeline] sendToProvider - Sending message via IPC')
+          console.log(`[SEND 06] [${timestamp}] [renderer] Sending message via IPC`)
           // Marcar chat como gerando
           get().setChatGenerating(chatId, true)
 
@@ -406,11 +423,11 @@ export const useStore = create<InfinyState>()(
           }))
 
           // Enviar para o provider via IPC (inclui chatId)
-          console.log('[Renderer] [Pipeline] sendToProvider - Calling electronAPI.sendToProvider')
+          console.log(`[SEND 16] [${timestamp}] [renderer] Calling electronAPI.sendToProvider`)
           await window.electronAPI?.sendToProvider(chatId, message, images)
-          console.log('[Renderer] [Pipeline] sendToProvider - IPC call completed')
+          console.log(`[SEND 16b] [${timestamp}] [renderer] IPC call completed`)
         } catch (error) {
-          console.error('[Renderer] [Pipeline] sendToProvider - Error sending message:', error)
+          console.error(`[SEND 06] [${timestamp}] [renderer] Error sending message:`, error)
           get().setChatGenerating(chatId, false)
 
           // Remover mensagem de streaming em caso de erro
@@ -544,30 +561,34 @@ export const useStore = create<InfinyState>()(
       },
 
       _setupElectronListeners: () => {
-        console.log('[Renderer] [Pipeline] _setupElectronListeners called')
+        const timestamp = new Date().toISOString()
+        const chatId = get().currentChat?.id
+        console.log(`[SEND 29] [${timestamp}] [renderer] _setupElectronListeners called`, { chatId, hasOutputCleanup: !!outputCleanup, hasErrorCleanup: !!errorCleanup, hasExitCleanup: !!exitCleanup, hasResponseCompleteCleanup: !!responseCompleteCleanup })
         // Limpar listeners anteriores
         get()._cleanupElectronListeners()
 
         // Listener para saída do provider (streaming) - agora recebe chatId
         outputCleanup = window.electronAPI?.onProviderOutput((data: { chatId: string; content: string }) => {
-          console.log('[Renderer] [Pipeline] onProviderOutput RECEIVED', { chatId: data.chatId, contentLength: data.content.length })
+          const receiveTimestamp = new Date().toISOString()
+          console.log(`[SEND 30] [${receiveTimestamp}] [renderer] onProviderOutput RECEIVED`, { chatId: data.chatId, contentLength: data.content.length })
           const state = get()
           const chat = state.chats.find((c) => c.id === data.chatId)
           if (chat) {
             const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderOutput - Updating streaming message for chat', data.chatId)
+              console.log(`[SEND 31] [${receiveTimestamp}] [renderer] updateMessage CALL (append content)`, { chatId: data.chatId, messageId: lastMessage.id, newContentLength: lastMessage.content.length + data.content.length })
               get().updateMessage(data.chatId, lastMessage.id, {
                 content: lastMessage.content + data.content,
               })
             } else {
-              console.warn('[Renderer] [Pipeline] onProviderOutput - No streaming message to update for chat', data.chatId, 'lastMessage:', lastMessage?.role, lastMessage?.isStreaming)
+              console.warn(`[SEND 30] [${receiveTimestamp}] [renderer] onProviderOutput - No streaming message to update for chat`, data.chatId, 'lastMessage:', lastMessage?.role, lastMessage?.isStreaming)
             }
           }
         })
 
         errorCleanup = window.electronAPI?.onProviderError((data: { chatId: string; error: string }) => {
-          console.error('[Renderer] [Pipeline] onProviderError RECEIVED:', data)
+          const receiveTimestamp = new Date().toISOString()
+          console.error(`[SEND 30-ERR] [${receiveTimestamp}] [renderer] onProviderError RECEIVED:`, data)
           // Append error to streaming message
           const state = get()
           const chat = state.chats.find((c) => c.id === data.chatId)
@@ -582,7 +603,8 @@ export const useStore = create<InfinyState>()(
         })
 
         exitCleanup = window.electronAPI?.onProviderExit((data: { chatId: string; code: number }) => {
-          console.log('[Renderer] [Pipeline] onProviderExit RECEIVED, chatId:', data.chatId, 'code:', data.code)
+          const receiveTimestamp = new Date().toISOString()
+          console.log(`[END 06] [${receiveTimestamp}] [renderer] onProviderExit RECEIVED`, { chatId: data.chatId, code: data.code })
           get().setChatGenerating(data.chatId, false)
 
           // Finalizar mensagem de streaming
@@ -591,7 +613,7 @@ export const useStore = create<InfinyState>()(
           if (chat) {
             const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderExit - Finalizing streaming message for chat', data.chatId)
+              console.log(`[END 08] [${receiveTimestamp}] [renderer] onProviderExit - Finalizing streaming message (isStreaming=false)`, { chatId: data.chatId, messageId: lastMessage.id })
               get().updateMessage(data.chatId, lastMessage.id, {
                 isStreaming: false,
               })
@@ -601,7 +623,8 @@ export const useStore = create<InfinyState>()(
 
         // Listener para fim de resposta (quando provider emite 'result' type)
         responseCompleteCleanup = window.electronAPI?.onProviderResponseComplete((data: { chatId: string }) => {
-          console.log('[Renderer] [Pipeline] onProviderResponseComplete RECEIVED, chatId:', data.chatId)
+          const receiveTimestamp = new Date().toISOString()
+          console.log(`[END 06] [${receiveTimestamp}] [renderer] onProviderResponseComplete RECEIVED`, { chatId: data.chatId })
           get().setChatGenerating(data.chatId, false)
 
           // Finalizar mensagem de streaming
@@ -610,7 +633,7 @@ export const useStore = create<InfinyState>()(
           if (chat) {
             const lastMessage = chat.messages[chat.messages.length - 1]
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-              console.log('[Renderer] [Pipeline] onProviderResponseComplete - Finalizing streaming message for chat', data.chatId)
+              console.log(`[END 08] [${receiveTimestamp}] [renderer] onProviderResponseComplete - Finalizing streaming message (isStreaming=false)`, { chatId: data.chatId, messageId: lastMessage.id })
               get().updateMessage(data.chatId, lastMessage.id, {
                 isStreaming: false,
               })
@@ -620,7 +643,8 @@ export const useStore = create<InfinyState>()(
       },
 
       _cleanupElectronListeners: () => {
-        console.log('[Renderer] [Pipeline] _cleanupElectronListeners called')
+        const timestamp = new Date().toISOString()
+        console.log(`[SEND 29-CLEANUP] [${timestamp}] [renderer] _cleanupElectronListeners called`, { hasOutputCleanup: !!outputCleanup, hasErrorCleanup: !!errorCleanup, hasExitCleanup: !!exitCleanup, hasResponseCompleteCleanup: !!responseCompleteCleanup })
         if (outputCleanup) outputCleanup()
         if (errorCleanup) errorCleanup()
         if (exitCleanup) exitCleanup()

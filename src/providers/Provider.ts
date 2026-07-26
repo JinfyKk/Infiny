@@ -402,7 +402,9 @@ export class ProviderManager {
    * Envia mensagem para o provider ativo.
    */
   async send(chatId: string, message: string, images?: string[]): Promise<void> {
-    console.log('[ProviderManager] send() - START, provider:', this.activeProvider?.getId(), 'chatId:', chatId)
+    const timestamp = new Date().toISOString()
+    const providerId = this.activeProvider?.getId()
+    console.log(`[SEND 19] [${timestamp}] [main] ProviderManager.send() START`, { providerId, chatId, messageLength: message.length, imagesCount: images?.length || 0 })
     if (!this.activeProvider) {
       throw new Error('Nenhum provider ativo. Selecione um provider primeiro.')
     }
@@ -418,7 +420,7 @@ export class ProviderManager {
     }
 
     await this.activeProvider.send(chatId, message, images)
-    console.log('[ProviderManager] send() - COMPLETED')
+    console.log(`[SEND 19] [${timestamp}] [main] ProviderManager.send() COMPLETED`)
   }
 
   /**
@@ -511,24 +513,34 @@ export class ProviderManager {
     this.cleanupProviderListeners()
 
     this.activeDataCleanup = this.activeProvider.onData((data) => {
+      const timestamp = new Date().toISOString()
+      console.log(`[SEND 27] [${timestamp}] [main] ProviderManager.onData FORWARDING to ${this.dataListeners.size} global listeners`, { dataLength: data.length })
       this.dataListeners.forEach((cb) => cb(data))
     })
 
     this.activeErrorCleanup = this.activeProvider.onError((error) => {
+      const timestamp = new Date().toISOString()
+      console.log(`[SEND 27-ERR] [${timestamp}] [main] ProviderManager.onError FORWARDING to ${this.errorListeners.size} global listeners`)
       this.errorListeners.forEach((cb) => cb(error))
     })
 
     this.activeExitCleanup = this.activeProvider.onExit((code) => {
+      const timestamp = new Date().toISOString()
+      console.log(`[SEND 27-EXIT] [${timestamp}] [main] ProviderManager.onExit FORWARDING to ${this.exitListeners.size} global listeners`)
       this.exitListeners.forEach((cb) => cb(code))
       // Auto-cleanup quando provider para
       this.cleanupProviderListeners()
     })
 
     this.activeReadyCleanup = this.activeProvider.onReady?.(() => {
+      const timestamp = new Date().toISOString()
+      console.log(`[END 03] [${timestamp}] [main] ProviderManager.onReady FORWARDING to ${this.readyListeners.size} global listeners`)
       this.readyListeners.forEach((cb) => cb())
     })
 
     this.activeResponseCompleteCleanup = this.activeProvider.onResponseComplete?.(() => {
+      const timestamp = new Date().toISOString()
+      console.log(`[END 03] [${timestamp}] [main] ProviderManager.onResponseComplete FORWARDING to ${this.responseCompleteListeners.size} global listeners`)
       this.responseCompleteListeners.forEach((cb) => cb())
     })
   }

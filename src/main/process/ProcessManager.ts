@@ -186,7 +186,12 @@ export class ProcessManager extends EventEmitter {
           if (buffer) {
             buffer.stdout.push(output)
           }
-          console.log('[ProcessManager] [Pipeline] stdout DATA', { name, outputPreview: output.slice(0, 200) })
+          const timestamp = new Date().toISOString()
+          console.log(`[SEND 24] [${timestamp}] [main] ProcessManager EMIT process-output (stdout)`, {
+            name,
+            outputLength: output.length,
+            outputPreview: output.slice(0, 200)
+          })
           this.emit(
             'process-output',
             name,
@@ -461,7 +466,8 @@ export class ProcessManager extends EventEmitter {
   writeToProcess(name: string, data: string): boolean {
     const info = this.processes.get(name)
 
-    console.log('[ProcessManager] [Pipeline] writeToProcess CALLED', {
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 21] [${timestamp}] [main] ProcessManager.writeToProcess CALLED`, {
       name,
       dataLength: data.length,
       hasInfo: !!info,
@@ -472,7 +478,7 @@ export class ProcessManager extends EventEmitter {
     })
 
     if (!info || !info.process || info.status !== 'running') {
-      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: Process not running', {
+      console.warn(`[SEND 21] [${timestamp}] [main] ProcessManager.writeToProcess FAILED: Process not running`, {
         name,
         hasInfo: !!info,
         processExists: !!info?.process,
@@ -484,7 +490,7 @@ export class ProcessManager extends EventEmitter {
     const stdin = info.process.stdin
 
     if (!stdin || !stdin.writable) {
-      console.warn('[ProcessManager] [Pipeline] writeToProcess FAILED: stdin not writable', {
+      console.warn(`[SEND 21] [${timestamp}] [main] ProcessManager.writeToProcess FAILED: stdin not writable`, {
         name,
         stdinExists: !!stdin,
         stdinWritable: !!stdin?.writable
@@ -495,14 +501,14 @@ export class ProcessManager extends EventEmitter {
     try {
       const bytesWritten = Buffer.byteLength(data, 'utf8')
       const success = stdin.write(data)
-      console.log('[ProcessManager] [Pipeline] writeToProcess SUCCESS', {
+      console.log(`[SEND 21] [${timestamp}] [main] ProcessManager.writeToProcess SUCCESS`, {
         name,
         bytesWritten,
         success
       })
       return success
     } catch (error) {
-      console.error('[ProcessManager] [Pipeline] writeToProcess ERROR', {
+      console.error(`[SEND 21] [${timestamp}] [main] ProcessManager.writeToProcess ERROR`, {
         name,
         error: error instanceof Error ? error.message : String(error)
       })

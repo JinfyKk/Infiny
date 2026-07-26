@@ -238,6 +238,10 @@ function saveProject(project: ProjectConfig) {
 // ============================================
 
 function sendToRenderer(event: string, data: unknown) {
+  const timestamp = new Date().toISOString()
+  if (event.startsWith('provider-') || event.startsWith('process-')) {
+    console.log(`[SEND 28] [${timestamp}] [main] sendToRenderer: ${event}`, data)
+  }
   mainWindow?.webContents.send(event, data)
 }
 
@@ -250,6 +254,8 @@ function sendToRenderer(event: string, data: unknown) {
  */
 function setupProviderListeners(): void {
   providerManager.onData((data: string) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 28] [${timestamp}] [main] onData CALLBACK -> sendToRenderer('provider-output')`, { chatId: currentStreamingChatId, dataLength: data.length })
     if (currentStreamingChatId) {
       sendToRenderer('provider-output', { chatId: currentStreamingChatId, content: data })
     } else {
@@ -259,6 +265,8 @@ function setupProviderListeners(): void {
   })
 
   providerManager.onError((error: string) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 28-ERR] [${timestamp}] [main] onError CALLBACK -> sendToRenderer('provider-error')`, { chatId: currentStreamingChatId, error })
     if (currentStreamingChatId) {
       sendToRenderer('provider-error', { chatId: currentStreamingChatId, error })
     } else {
@@ -267,6 +275,8 @@ function setupProviderListeners(): void {
   })
 
   providerManager.onExit((code: number) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[END 04] [${timestamp}] [main] onExit CALLBACK -> sendToRenderer('provider-exit')`, { chatId: currentStreamingChatId, code })
     if (currentStreamingChatId) {
       sendToRenderer('provider-exit', { chatId: currentStreamingChatId, code })
       // Clear the streaming chatId when provider exits
@@ -277,13 +287,15 @@ function setupProviderListeners(): void {
   })
 
   providerManager.onReady(() => {
-    console.log('[Main] [ProviderManager] provider-ready event received, forwarding to renderer')
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 14] [${timestamp}] [main] onReady CALLBACK -> sendToRenderer('provider-ready')`, { providerId: activeProviderId })
     providerReadyFired = true
     sendToRenderer('provider-ready', { providerId: activeProviderId })
   })
 
   providerManager.onResponseComplete(() => {
-    console.log('[Main] [ProviderManager] provider-response-complete event received, forwarding to renderer')
+    const timestamp = new Date().toISOString()
+    console.log(`[END 04] [${timestamp}] [main] onResponseComplete CALLBACK -> sendToRenderer('provider-response-complete')`, { chatId: currentStreamingChatId })
     if (currentStreamingChatId) {
       sendToRenderer('provider-response-complete', { chatId: currentStreamingChatId })
       // Clear the streaming chatId when response completes
@@ -381,28 +393,27 @@ async function stopActiveProvider(): Promise<void> {
  */
 async function sendToActiveProvider(chatId: string, message: string, images?: string[]): Promise<boolean> {
   try {
-    console.log('[Main] [Pipeline] sendToActiveProvider RECEIVED', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
+    const timestamp = new Date().toISOString()
     const activeProvider = providerManager.getActiveProvider()
+    const providerId = activeProvider?.getId()
+    console.log(`[SEND 17] [${timestamp}] [main] IPC send-to-provider RECEIVED`, { chatId, messageLength: message.length, imagesCount: images?.length || 0, providerId, activeProviderConfig })
 
     if (!activeProvider) {
-      console.error('[Main] [Pipeline] sendToActiveProvider FAILED: No active provider')
+      console.error(`[SEND 17] [${timestamp}] [main] sendToActiveProvider FAILED: No active provider`)
       sendToRenderer('provider-error', { chatId, error: 'Nenhum provedor ativo' })
       return false
     }
 
-    console.log('[Main] [Pipeline] sendToActiveProvider: Active provider is', activeProvider.getId())
-
-    // Set current streaming chatId for routing events
+    console.log(`[SEND 18] [${timestamp}] [main] sendToActiveProvider: currentStreamingChatId = ${chatId}`)
     currentStreamingChatId = chatId
 
-    // Delegar SEMPRE para o Provider via ProviderManager.send()
-    // O Provider sabe como lidar com seu próprio transporte (ProcessManager, stdio, HTTP, etc.)
-    console.log('[Main] [Pipeline] Calling providerManager.send()')
+    console.log(`[SEND 19] [${timestamp}] [main] Calling providerManager.send()`)
     await providerManager.send(chatId, message, images)
-    console.log('[Main] [Pipeline] sendToActiveProvider SUCCESS')
+    console.log(`[SEND 19] [${timestamp}] [main] providerManager.send() COMPLETED`)
     return true
   } catch (error: any) {
-    console.error('[Main] [Pipeline] sendToActiveProvider ERROR:', error)
+    const timestamp = new Date().toISOString()
+    console.error(`[SEND 17] [${timestamp}] [main] sendToActiveProvider ERROR:`, error)
     sendToRenderer('provider-error', { chatId, error: `Erro ao enviar mensagem: ${error.message}` })
     return false
   }

@@ -57,7 +57,13 @@ interface StartProviderResult {
 
 function createListener<T = unknown>(channel: string) {
   return (callback: (data: T) => void) => {
-    const listener = (_event: IpcRendererEvent, data: T) => callback(data)
+    const listener = (_event: IpcRendererEvent, data: T) => {
+      const timestamp = new Date().toISOString()
+      if (channel.startsWith('provider-') || channel.startsWith('process-')) {
+        console.log(`[SEND 29] [${timestamp}] [renderer] preload createListener RECEIVED: ${channel}`, data)
+      }
+      callback(data)
+    }
     ipcRenderer.on(channel, listener)
     return () => {
       ipcRenderer.removeListener(channel, listener)
@@ -82,10 +88,16 @@ const electronAPI = {
   // ---------- Provider / Processos ----------
   getProcessStatusSnapshot: (): Promise<ProcessStatusSnapshot> =>
     ipcRenderer.invoke('get-process-status-snapshot'),
-  startProvider: (projectPath: string, config?: Partial<ProviderConfig>, source?: string): Promise<StartProviderResult> =>
-    ipcRenderer.invoke('start-provider', projectPath, config, source),
-  sendToProvider: (chatId: string, message: string, images?: string[]): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke('send-to-provider', chatId, message, images),
+  startProvider: (projectPath: string, config?: Partial<ProviderConfig>, source?: string): Promise<StartProviderResult> => {
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 06] [${timestamp}] [renderer] electronAPI.startProvider INVOKE`, { projectPath, config, source })
+    return ipcRenderer.invoke('start-provider', projectPath, config, source)
+  },
+  sendToProvider: (chatId: string, message: string, images?: string[]): Promise<{ success: boolean }> => {
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 16] [${timestamp}] [renderer] electronAPI.sendToProvider INVOKE`, { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
+    return ipcRenderer.invoke('send-to-provider', chatId, message, images)
+  },
   stopProvider: (chatId: string): Promise<{ success: boolean }> => ipcRenderer.invoke('stop-provider', chatId),
   restartProvider: (): Promise<StartProviderResult> => ipcRenderer.invoke('restart-provider'),
   getProviderConfig: (): Promise<{ providerId: string; config: ProviderConfig }> =>

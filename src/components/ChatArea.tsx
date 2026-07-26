@@ -81,17 +81,29 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
     const images = [...pendingImages]
     if (!text && images.length === 0) return
 
-    console.log('[ChatArea] [Pipeline] handleSend START', { textLength: text.length, imagesCount: images.length })
+    const timestamp = new Date().toISOString()
+    const chatId = currentChat!.id
+    const providerId = settings.provider
+    const model = settings.model
+    console.log(`[SEND 01] [${timestamp}] [renderer] handleSend START`, {
+      chatId,
+      providerId,
+      model,
+      textLength: text.length,
+      imagesCount: images.length,
+      projectPath: currentProject?.path,
+    })
 
     setInputValue('')
 
     const userMessage = { role: 'user' as const, content: text, images: images.length > 0 ? images : undefined, timestamp: Date.now() }
-    addMessage(currentChat!.id, userMessage)
+    console.log(`[SEND 02] [${timestamp}] [renderer] addMessage CALL`, { chatId, messageLength: text.length })
+    addMessage(chatId, userMessage)
 
     clearPendingImages()
-    console.log('[ChatArea] [Pipeline] Calling sendToProvider')
-    await sendToProvider(currentChat!.id, text, images)
-    console.log('[ChatArea] [Pipeline] handleSend COMPLETED')
+    console.log(`[SEND 03] [${timestamp}] [renderer] sendToProvider CALL`, { chatId, textLength: text.length, imagesCount: images.length })
+    await sendToProvider(chatId, text, images)
+    console.log(`[SEND 04] [${timestamp}] [renderer] handleSend COMPLETED`, { chatId })
   }
 
   const handleStop = () => {

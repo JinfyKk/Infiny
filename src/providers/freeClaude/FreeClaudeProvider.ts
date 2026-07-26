@@ -602,20 +602,21 @@ export class FreeClaudeProvider implements AIProvider {
    * Parseia e chama callback de dados com apenas o texto.
    */
   private handleProviderOutput(rawData: string): void {
-    console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput START', { rawDataLength: rawData.length, bufferLength: this.messageBuffer.length })
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 25] [${timestamp}] [main] FreeClaudeProvider.handleProviderOutput START`, { rawDataLength: rawData.length, bufferLength: this.messageBuffer.length })
     this.messageBuffer += rawData
     const lines = this.messageBuffer.split('\n')
     this.messageBuffer = lines.pop() || ''
 
-    console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput split into', lines.length, 'lines, buffer remaining:', this.messageBuffer.length)
+    console.log(`[SEND 25] [${timestamp}] [main] FreeClaudeProvider.handleProviderOutput split into ${lines.length} lines, buffer remaining:`, this.messageBuffer.length)
 
     for (const line of lines) {
       if (!line.trim()) continue
 
       const parsed = this.parseStreamJson(line.trim())
-      console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput parsed:', parsed)
+      console.log(`[SEND 25] [${timestamp}] [main] FreeClaudeProvider.handleProviderOutput parsed:`, parsed)
       if (parsed?.text && this.dataCallback) {
-        console.log('[FreeClaudeProvider] [Pipeline] handleProviderOutput calling dataCallback', { type: parsed.type, textLength: parsed.text.length })
+        console.log(`[SEND 26] [${timestamp}] [main] FreeClaudeProvider.handleProviderOutput calling dataCallback`, { type: parsed.type, textLength: parsed.text.length })
         if (parsed.type === 'assistant') {
           this.dataCallback(parsed.text)
         } else if (parsed.type === 'system') {
@@ -632,11 +633,12 @@ export class FreeClaudeProvider implements AIProvider {
    * Envia mensagem para o Claude CLI via ProcessManager → stdin.
    */
   async send(chatId: string, message: string, images?: string[]): Promise<void> {
-    console.log('[FreeClaudeProvider] [Pipeline] send() START', { chatId, messageLength: message.length, imagesCount: images?.length || 0 })
+    const timestamp = new Date().toISOString()
+    console.log(`[SEND 20] [${timestamp}] [main] FreeClaudeProvider.send() START`, { chatId, messageLength: message.length, imagesCount: images?.length || 0, providerId: this.getId() })
     const pm = this.processManager!
     if (!pm.isRunning('claude')) {
-      console.error('[FreeClaudeProvider] [Pipeline] send() FAILED: No active claude process or stdin not writable')
-      console.error('[FreeClaudeProvider] [Pipeline] send() pm.isRunning("claude"):', pm.isRunning('claude'))
+      console.error(`[SEND 20] [${timestamp}] [main] FreeClaudeProvider.send() FAILED: No active claude process or stdin not writable`)
+      console.error(`[SEND 20] [${timestamp}] [main] FreeClaudeProvider.send() pm.isRunning("claude"):`, pm.isRunning('claude'))
       throw new Error('Processo Claude não está rodando')
     }
 
@@ -653,14 +655,14 @@ export class FreeClaudeProvider implements AIProvider {
         })
       : JSON.stringify({ type: 'user', message: { role: 'user', content: message } })
 
-    console.log('[FreeClaudeProvider] [Pipeline] send() JSON payload to Claude:', payload.slice(0, 200) + (payload.length > 200 ? '...' : ''))
+    console.log(`[SEND 20] [${timestamp}] [main] FreeClaudeProvider.send() JSON payload to Claude:`, payload.slice(0, 200) + (payload.length > 200 ? '...' : ''))
 
     const success = pm.writeToProcess('claude', payload + '\n')
     if (!success) {
-      console.error('[FreeClaudeProvider] [Pipeline] send() FAILED: writeToProcess returned false')
+      console.error(`[SEND 21] [${timestamp}] [main] FreeClaudeProvider.send() FAILED: writeToProcess returned false`)
       throw new Error('Falha ao escrever no stdin do processo claude')
     }
-    console.log('[FreeClaudeProvider] [Pipeline] send() SUCCESS: payload written to stdin, bytes:', Buffer.byteLength(payload + '\n'))
+    console.log(`[SEND 21] [${timestamp}] [main] FreeClaudeProvider.send() SUCCESS: payload written to stdin, bytes:`, Buffer.byteLength(payload + '\n'))
   }
 
   /**
@@ -773,7 +775,8 @@ export class FreeClaudeProvider implements AIProvider {
   private parseStreamJson(line: string): { type: string; text?: string } | null {
     try {
       const parsed = JSON.parse(line)
-      console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson PARSED', { type: parsed.type, subtype: parsed.subtype, hasMessage: !!parsed.message, hasResult: !!parsed.result })
+      const timestamp = new Date().toISOString()
+      console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson PARSED`, { type: parsed.type, subtype: parsed.subtype, hasMessage: !!parsed.message, hasResult: !!parsed.result })
 
       // Tipo: assistant - conteúdo da resposta
       if (parsed.type === 'assistant' && parsed.message?.content) {
@@ -782,14 +785,14 @@ export class FreeClaudeProvider implements AIProvider {
           .map((c: any) => c.text)
           .join('')
         if (textContent) {
-          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson ASSISTANT', { textLength: textContent.length })
+          console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson ASSISTANT`, { textLength: textContent.length })
           return { type: 'assistant', text: textContent }
         }
       }
 
       // Tipo: result - resultado final
       if (parsed.type === 'result' && parsed.result) {
-        console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson RESULT', { textLength: parsed.result.length })
+        console.log(`[END 01] [${timestamp}] [main] parseStreamJson RESULT type detected, calling responseCompleteCallback`, { textLength: parsed.result.length })
         this.responseCompleteCallback?.()
         return { type: 'result', text: parsed.result }
       }
@@ -799,19 +802,20 @@ export class FreeClaudeProvider implements AIProvider {
         if (parsed.subtype === 'init') {
           // Ignore session init message - FCC/Claude Code handles its own initialization
           // Do not create artificial "Sessão iniciada" message
-          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_INIT ignored')
+          console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson SYSTEM_INIT ignored`)
           return null
         }
         if (parsed.subtype === 'thinking_tokens') {
-          console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson SYSTEM_THINKING')
+          console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson SYSTEM_THINKING`)
           return { type: 'thinking', text: '' }
         }
       }
 
-      console.log('[FreeClaudeProvider] [Pipeline] parseStreamJson IGNORED type:', parsed.type)
+      console.log(`[SEND 25] [${timestamp}] [main] parseStreamJson IGNORED type:`, parsed.type)
       return null
     } catch (error) {
-      console.warn('[FreeClaudeProvider] [Pipeline] parseStreamJson FAILED', { linePreview: line.substring(0, 100), error: error instanceof Error ? error.message : String(error) })
+      const timestamp = new Date().toISOString()
+      console.warn(`[SEND 25] [${timestamp}] [main] parseStreamJson FAILED`, { linePreview: line.substring(0, 100), error: error instanceof Error ? error.message : String(error) })
       return null
     }
   }
