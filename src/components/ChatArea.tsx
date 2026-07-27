@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { Send, X, Paperclip, Globe, StopCircle, Sparkles, FolderOpen, MessageSquare, FileText, Brain } from 'lucide-react'
+import { Send, X, Paperclip, Globe, StopCircle, FolderOpen, MessageSquare, FileText, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/infinyStore'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { Message } from './Message'
 import { ModelSelector } from './ModelSelector'
 import { EffortSelector } from './EffortSelector'
 import { ProviderSelector } from './ProviderSelector'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import { ThemeSelector } from '@/theme/ThemeSelector'
 import { motion, AnimatePresence } from 'framer-motion'
 import { transitions } from '@/lib/transitions'
@@ -177,8 +178,8 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
       <div className="flex-1 flex flex-col bg-background overflow-hidden">
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center max-w-md mx-auto">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <Sparkles className="w-10 h-10 text-primary" />
+            <div className="w-28 h-28 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <img src={turtlyImg} alt="Turtly" className="w-20 h-20 object-contain" />
             </div>
             <h2 className="text-2xl font-medium text-text mb-3">Bem-vindo ao Infiny</h2>
             <p className="text-textSecondary mb-6 leading-relaxed">

@@ -10,9 +10,8 @@ import {
   Server,
   Cpu,
   Wifi,
-  Sparkles,
-  Eye,
 } from 'lucide-react'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 
 interface SplashScreenProps {
   onComplete: () => void
@@ -68,7 +67,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     {
       id: 'connect',
       label: 'Conectando ao ambiente',
-      icon: <Sparkles className="w-5 h-5" />,
+      icon: <img src={turtlyImg} alt="Turtly" className="w-5 h-5 object-contain" />,
       status: 'pending',
     },
   ])
@@ -325,7 +324,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           <div className="text-center mb-8">
 
             <motion.div
-              className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-accent mb-4"
+              className="inline-flex items-center justify-center w-20 h-20 mb-4"
               initial={{
                 scale: 0,
                 rotate: -180,
@@ -341,7 +340,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                 delay: 0.2,
               }}
             >
-              <Eye className="w-8 h-8 text-white" />
+              <img src={turtlyImg} alt="Turtly" className="w-16 h-16 object-contain" />
             </motion.div>
 
 
@@ -609,9 +608,9 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         </motion.div>
 
 
-        <motion.p
+        <motion.div
 
-          className="text-center text-xs text-muted-foreground mt-6"
+          className="flex items-center justify-center gap-1.5 mt-6"
 
           initial={{
             opacity: 0,
@@ -627,9 +626,18 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
 
         >
 
-          Infiny v1.0.0 — Powered by free-claude-code
+          <img
+            src={turtlyImg}
+            alt="Turtly"
+            title="Turtly tá vigiando o carregamento"
+            className="w-4 h-4 object-contain"
+          />
 
-        </motion.p>
+          <p className="text-center text-xs text-muted-foreground">
+            Infiny v1.0.0 — Powered by free-claude-code
+          </p>
+
+        </motion.div>
 
 
       </div>

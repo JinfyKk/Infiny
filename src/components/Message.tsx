@@ -3,13 +3,23 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Copy, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
+import { useStore } from '@/store/infinyStore'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import {
   chatMessageVariants,
   chatMessageStreamingVariants,
   transitions,
 } from '@/lib/transitions'
+
+const PROVIDER_LABELS: Record<string, string> = {
+  'free-claude': 'Claude',
+  claude: 'Claude',
+  openai: 'ChatGPT',
+  gemini: 'Gemini',
+  local: 'Ollama',
+}
 
 interface MessageProps {
   message: {
@@ -106,21 +116,97 @@ const renderers = {
 }
 
 function TypingIndicator() {
+  const provider = useStore((state) => state.settings.provider)
+  const providerLabel = PROVIDER_LABELS[provider] || 'provedor'
+
+const allMessages = useMemo(
+  () => [
+    '🐢 ajustando o casco e preparando a resposta...',
+    '🐢 procurando a resposta perfeita...',
+    '🐢 lendo milhões de possibilidades...',
+    '🐢 atravessando a floresta de possibilidades...',
+    '🐢 vencendo a corrida contra o coelho...',
+    '🐢 pedindo ajuda a amigos tartarugas...',
+    `🐢 perguntando pro ${providerLabel}...`,
+    '🐢 levando a resposta até você...',
+  ],
+  [providerLabel]
+)
+  // Embaralha as frases e escolhe quantas vão aparecer dessa vez —
+  // não precisa mostrar todas, e a ordem muda a cada resposta.
+  const sequence = useMemo(() => {
+    const shuffled = [...allMessages].sort(() => Math.random() - 0.5)
+    const count = 1 + Math.floor(Math.random() * shuffled.length)
+    return shuffled.slice(0, count)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMessages])
+
+  const [visible, setVisible] = useState(false)
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    setVisible(false)
+    setIndex(0)
+
+    // Demora um pouco mais pra primeira frase aparecer (fica só nos
+    // pontinhos até lá)
+    const firstDelay = 1800 + Math.random() * 1400
+    const showTimer = setTimeout(() => setVisible(true), firstDelay)
+
+    let cancelled = false
+    let stepTimer: ReturnType<typeof setTimeout>
+
+    const scheduleNext = (i: number) => {
+      const delay = 3200 + Math.random() * 2200
+      stepTimer = setTimeout(() => {
+        if (cancelled) return
+        setIndex((prev) => (prev < sequence.length - 1 ? prev + 1 : prev))
+        if (i < sequence.length - 1) scheduleNext(i + 1)
+      }, delay)
+    }
+    scheduleNext(0)
+
+    return () => {
+      cancelled = true
+      clearTimeout(showTimer)
+      clearTimeout(stepTimer)
+    }
+  }, [sequence])
+
+  if (!visible) {
+    return (
+      <div className="flex items-center gap-1 py-1 px-0.5" role="status" aria-label="Pensando...">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="w-2 h-2 rounded-full bg-textMuted"
+            animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
+            transition={{
+              duration: 0.9,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: i * 0.15,
+            }}
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="flex items-center gap-1 py-1 px-0.5" role="status" aria-label="Pensando...">
-      {[0, 1, 2].map((i) => (
+    <div className="flex items-center gap-2 py-1 px-0.5" role="status" aria-label={sequence[index]}>
+      <AnimatePresence mode="wait">
         <motion.span
-          key={i}
-          className="w-2 h-2 rounded-full bg-textMuted"
-          animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
-          transition={{
-            duration: 0.9,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: i * 0.15,
-          }}
-        />
-      ))}
+          key={index}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+          className="text-sm text-textMuted"
+        >
+          {sequence[index]}
+        </motion.span>
+      </AnimatePresence>
     </div>
   )
 }
@@ -159,7 +245,7 @@ export function Message({ message, isStreaming = false }: MessageProps) {
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
           transition={transitions.bouncy}
         >
-          <Sparkles className="w-4 h-4 text-primary" />
+          <img src={turtlyImg} alt="Turtly" className="w-5 h-5 object-contain" />
         </motion.div>
       )}
 

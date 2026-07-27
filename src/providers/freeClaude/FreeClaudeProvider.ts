@@ -1,5 +1,6 @@
 import { AIProvider, ProviderConfig, ProviderManager } from '../Provider'
 import { ProcessManager, ProcessInfo } from '../../main/process/ProcessManager'
+import { TURTLY_SYSTEM_PROMPT } from '../persona'
 
 /**
  * Provider para Free Claude Code (via free-claude-code proxy).
@@ -416,6 +417,7 @@ export class FreeClaudeProvider implements AIProvider {
       '--input-format=stream-json',
       '--dangerously-skip-permissions',
       '--verbose',
+      '--append-system-prompt', TURTLY_SYSTEM_PROMPT,
     ]
 
     // Encontrar executável fcc-claude (launcher oficial)

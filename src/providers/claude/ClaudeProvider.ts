@@ -2,6 +2,7 @@ import { AIProvider, ProviderConfig, ProviderManager } from '../Provider'
 import { spawn, ChildProcess, SpawnOptions } from 'child_process'
 import { existsSync } from 'fs'
 import { join } from 'path'
+import { TURTLY_SYSTEM_PROMPT } from '../persona'
 
 /**
  * Provider para Claude Code (Anthropic).
@@ -255,6 +256,7 @@ export class ClaudeProvider implements AIProvider {
       '--input-format=stream-json',
       '--dangerously-skip-permissions',
       '--verbose',
+      '--append-system-prompt', TURTLY_SYSTEM_PROMPT,
     ]
 
     if (config.webSearch) baseArgs.push('--web-search')

@@ -14,6 +14,7 @@ import {
   PROJECT_EDIT_SUFFIX,
 } from '@/lib/transitions'
 import { StaggerContainer, StaggerItem, AnimatedIcon } from '@/components/ui/AnimatedComponents'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 
 interface SidebarProps {
   isOpen: boolean
@@ -664,6 +665,12 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <span className="text-sm text-textSecondary flex-1">
                 {chats.length} chat{chats.length !== 1 ? 's' : ''} no total
               </span>
+              <img
+                src={turtlyImg}
+                alt="Turtly"
+                title="Turtly"
+                className="w-5 h-5 object-contain opacity-80"
+              />
             </div>
           </motion.div>
 

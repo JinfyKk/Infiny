@@ -128,6 +128,52 @@ let exitCleanup: (() => void) | null = null
 let responseCompleteCleanup: (() => void) | null = null
 let providerStartPromise: Promise<void> | null = null
 
+/**
+ * Monta um resumo compacto dos outros chats do usuário (mais recentes
+ * primeiro) pra dar ao Turtly contexto suficiente de "puxar o assunto" se a
+ * pessoa mencionar algo que já falou em outro chat.
+ *
+ * Isso NÃO é o histórico completo de tudo — seria pesado demais mandar em
+ * toda mensagem e cresceria sem limite conforme o uso do app. É um resumo
+ * limitado aos chats mais recentes e às últimas trocas de cada um, o
+ * suficiente pra reconhecer o assunto e continuar sem a pessoa repetir tudo.
+ */
+const MAX_OTHER_CHATS = 8
+const MAX_EXCERPT_LENGTH = 220
+
+function truncateExcerpt(text: string): string {
+  const clean = text.trim().replace(/\s+/g, ' ')
+  return clean.length > MAX_EXCERPT_LENGTH ? `${clean.slice(0, MAX_EXCERPT_LENGTH)}…` : clean
+}
+
+function buildOtherChatsDigest(chats: Chat[], currentChatId: string): string {
+  const others = chats
+    .filter((c) => c.id !== currentChatId && c.messages.length > 0)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_OTHER_CHATS)
+
+  if (others.length === 0) return ''
+
+  const lines = others.map((c) => {
+    const lastUser = [...c.messages].reverse().find((m) => m.role === 'user' && m.content)
+    const lastAssistant = [...c.messages].reverse().find((m) => m.role === 'assistant' && m.content)
+
+    const parts = [`- "${c.title}"`]
+    if (lastUser) parts.push(`usuário disse: "${truncateExcerpt(lastUser.content)}"`)
+    if (lastAssistant) parts.push(`você respondeu: "${truncateExcerpt(lastAssistant.content)}"`)
+
+    return parts.join(' — ')
+  })
+
+  return (
+    '[Contexto — outros chats recentes deste usuário. Use apenas se a mensagem ' +
+    'atual estiver relacionada a algum desses chats, pra continuar o assunto sem ' +
+    'pedir pra pessoa repetir tudo. Não liste nem mencione esses chats se não for ' +
+    'pedido — é só contexto de fundo.]\n' +
+    lines.join('\n')
+  )
+}
+
 export const useStore = create<InfinyState>()(
   persist(
     (set, get) => ({
@@ -436,8 +482,16 @@ export const useStore = create<InfinyState>()(
           }))
 
           // Enviar para o provider via IPC (inclui chatId)
+          // Anexa um resumo dos outros chats do usuário (se houver) só na
+          // mensagem que vai pro modelo — o que aparece na tela do chat
+          // continua sendo o texto puro que a pessoa digitou.
+          const otherChatsDigest = buildOtherChatsDigest(chats, chatId)
+          const messageForProvider = otherChatsDigest
+            ? `${otherChatsDigest}\n\n---\n\nMensagem do usuário:\n${message}`
+            : message
+
           console.log(`[SEND 16] [${timestamp}] [renderer] Calling electronAPI.sendToProvider`)
-          await window.electronAPI?.sendToProvider(chatId, message, images)
+          await window.electronAPI?.sendToProvider(chatId, messageForProvider, images)
           console.log(`[SEND 16b] [${timestamp}] [renderer] IPC call completed`)
         } catch (error) {
           console.error(`[SEND 06] [${timestamp}] [renderer] Error sending message:`, error)

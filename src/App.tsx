@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, ChevronLeft, FolderOpen, FileText } from 'lucide-react'
+import { ChevronLeft, FolderOpen, FileText } from 'lucide-react'
 import { useStore } from '@/store/infinyStore'
 import { Sidebar } from './components/Sidebar'
 import { ChatArea } from './components/ChatArea'
@@ -8,6 +8,7 @@ import { ThemeSelector } from '@/theme'
 import { ThemeProvider } from '@/theme'
 import { Onboarding } from './components/Onboarding'
 import { SplashScreen } from './components/SplashScreen'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSidebarShortcut } from '@/hooks/useKeyboardShortcuts'
@@ -72,7 +73,7 @@ function AppContent() {
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             className="w-16 h-16 mx-auto mb-4 text-primary"
           >
-            <Sparkles className="w-full h-full animate-pulse" />
+            <img src={turtlyImg} alt="Turtly" className="w-full h-full object-contain animate-pulse" />
           </motion.div>
           <p className="text-textSecondary">Carregando Infiny...</p>
         </div>

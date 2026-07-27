@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
-import { FileText, X, ChevronRight, ChevronDown, Search, Sparkles, Code, File, Image, FileCode, Archive } from 'lucide-react'
+import { FileText, X, ChevronRight, ChevronDown, Search, Code, File, Image, FileCode, Archive } from 'lucide-react'
 import { cn, formatFileSize, getFileIcon } from '@/lib/utils'
 import { useStore } from '@/store/infinyStore'
 import { motion, AnimatePresence } from 'framer-motion'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import {
   filesPanelVariants,
   fileTreeItemVariants,
@@ -171,7 +172,7 @@ export function FilesPanel({ isOpen, onClose }: FilesPanelProps) {
                   transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
                   className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center mb-4"
                 >
-                  <Sparkles className="w-8 h-8 opacity-30" />
+                  <img src={turtlyImg} alt="Turtly" className="w-9 h-9 object-contain opacity-30" />
                 </motion.div>
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}

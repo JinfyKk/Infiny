@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { ArrowRight, Check, Sparkles, Brain, Zap, Globe, Palette, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import {
   fadeInUpVariants,
   transitions,
@@ -217,7 +218,11 @@ export function Onboarding({ isOpen, onClose }: OnboardingProps) {
                   transition={shouldReduceMotion ? { duration: 0 } : { ...transitions.bouncy, delay: 0.15 }}
                   className={cn('w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6', colors.iconBg)}
                 >
-                  <step.icon className={cn('w-10 h-10', colors.text)} />
+                  {step.id === 'welcome' ? (
+                    <img src={turtlyImg} alt="Turtly" className="w-14 h-14 object-contain" />
+                  ) : (
+                    <step.icon className={cn('w-10 h-10', colors.text)} />
+                  )}
                 </motion.div>
 
                 {/* Title */}
@@ -317,7 +322,7 @@ export function Onboarding({ isOpen, onClose }: OnboardingProps) {
                       transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                       className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-3"
                     >
-                      <Sparkles className="w-7 h-7 text-primary" />
+                      <img src={turtlyImg} alt="Turtly" className="w-10 h-10 object-contain" />
                     </motion.div>
                     <p className="font-medium text-text mb-1">A Turtly está torcendo por você! 🐢</p>
                     <p className="text-textSecondary text-sm">Lembre-se: devagar e sempre se chega lá.</p>
