@@ -79,6 +79,7 @@ Gerar o instalador Windows (`.exe`, via `electron-builder`):
 ```bash
 npx electron-builder
 ```
+<img width="500" height="500" alt="Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview" src="https://github.com/user-attachments/assets/d38eb387-91b6-43f0-8fd1-f78e96fe61ca" />
 
 ## Providers suportados
 
