@@ -13,6 +13,12 @@ O Infiny é uma aplicação desktop que envolve o Claude Code em uma interface v
 
 [Funcionalidades](#funcionalidades) · [Início rápido](#início-rápido) · [Providers](#providers-suportados) · [Arquitetura](#arquitetura) · [Scripts](#scripts-disponíveis) · [Roadmap](#roadmap)
 
+![Infiny imagem](images/Infiny%20imagem%20pro%20github1.png)
+
+
+![Infiny imagem](images/Infiny%20imagem%20pro%20github2.png)
+
+
 
 ## Funcionalidades
 
