@@ -4,7 +4,7 @@ import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg
 
 const CLICKS_TO_ACTIVATE = 3
 const CATCH_DISTANCE = 46 // px — distância pra considerar que a Turtly "alcançou" o mouse
-const CHASE_SPEED = 0.09 // 0-1, quanto maior mais rápido ela persegue
+const CHASE_SPEED = 0.045 // 0-1, quanto maior mais rápido ela persegue
 const MIN_CHASE_FRAMES = 12 // evita "pegar" o mouse no instante em que sai correndo
 const PUSH_DISTANCE = 90 // px que o cursor "voa" ao ser empurrado
 

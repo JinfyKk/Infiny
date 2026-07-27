@@ -82,8 +82,7 @@ const renderers = {
       </motion.div>
     )
   },
-  a({ node, children, ...props }: any) {
-    const href = node.url
+  a({ node, children, href, ...props }: any) {
     const isExternal = typeof href === 'string' && /^https?:\/\//i.test(href)
 
     const handleClick = (e: any) => {
