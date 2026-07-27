@@ -114,6 +114,8 @@ const electronAPI = {
 
   // ---------- Arquivos ----------
   openFile: (path: string): Promise<void> => ipcRenderer.invoke('open-file', path),
+  openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('open-external', url),
   getFileInfo: (path: string): Promise<{ name?: string; size: number; modified: Date } | null> =>
     ipcRenderer.invoke('get-file-info', path),
   readFile: (path: string): Promise<{ success: boolean; content?: string; error?: string }> =>

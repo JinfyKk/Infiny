@@ -8,6 +8,7 @@ import { ThemeSelector } from '@/theme'
 import { ThemeProvider } from '@/theme'
 import { Onboarding } from './components/Onboarding'
 import { SplashScreen } from './components/SplashScreen'
+import { LinkWarningDialog } from '@/components/ui/LinkWarningDialog'
 import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -119,6 +120,9 @@ function AppContent() {
         {/* Onboarding */}
         <Onboarding isOpen={showOnboarding} onClose={handleOnboardingComplete} />
       </main>
+
+      {/* Aviso de redirecionamento ao clicar em links externos nas mensagens */}
+      <LinkWarningDialog />
     </motion.div>
   )
 }

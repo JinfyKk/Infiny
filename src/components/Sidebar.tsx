@@ -1,4 +1,4 @@
-import { FolderGit2, Plus, MessageSquare, ChevronRight, X, FolderOpen, Trash2, Edit2 } from 'lucide-react'
+import { Plus, Chat, CaretRight, X, FolderOpen, Folder, Trash, PencilSimple } from '@phosphor-icons/react'
 import { useState, useMemo } from 'react'
 import { cn, formatDate } from '@/lib/utils'
 import { useStore, INDEPENDENT_PROJECT_ID } from '@/store/infinyStore'
@@ -180,7 +180,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FolderGit2 className="w-4 h-4 text-primary" />
+                <img src={turtlyImg} alt="Infiny" className="w-7 h-7 object-contain" />
               </div>
               <span className="font-semibold text-lg text-text">Infiny</span>
             </div>
@@ -192,7 +192,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               aria-label="Fechar sidebar"
               interactionType="icon-rotate"
             >
-              <X className="w-5 h-5" />
+              <X weight="bold" className="w-5 h-5" />
             </Button>
           </motion.div>
 
@@ -243,7 +243,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     aria-label="Caminho da pasta do projeto"
                   />
                   <Button variant="secondary" size="sm" onClick={handleSelectFolder} aria-label="Selecionar pasta">
-                    <FolderOpen className="w-4 h-4" />
+                    <FolderOpen weight="duotone" className="w-4 h-4" />
                   </Button>
                 </div>
                 <div className="flex gap-2 justify-end">
@@ -257,7 +257,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               </motion.div>
             ) : (
               <Button variant="secondary" className="w-full justify-start gap-2" onClick={() => setShowNewProject(true)}>
-                <Plus className="w-4 h-4" />
+                <Plus weight="bold" className="w-4 h-4" />
                 <span>Novo Projeto</span>
               </Button>
             )}
@@ -273,7 +273,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <MessageSquare className="w-3.5 h-3.5 text-green-500" />
+                  <Chat weight="duotone" className="w-3.5 h-3.5 text-green-500" />
                 </div>
                 <span className="font-medium text-sm text-textPrimary">Chats Gerais</span>
               </div>
@@ -287,7 +287,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 aria-label="Novo chat independente"
                 className="h-7 px-2"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus weight="bold" className="w-3.5 h-3.5" />
               </Button>
             </div>
             {independentChats.length === 0 ? (
@@ -297,7 +297,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 transition={transitions.smooth}
                 className="px-3 py-4 text-center text-textMuted border border-dashed border-border rounded-lg"
               >
-                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <Chat weight="duotone" className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-xs">Nenhum chat independente</p>
                 <p className="text-[10px] mt-0.5">Clique no + para criar um</p>
               </motion.div>
@@ -325,7 +325,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                             startEditChat(chat.id, chat.title)
                           }}
                         >
-                          <MessageSquare
+                          <Chat
+                            weight="duotone"
                             className={cn(
                               'w-4 h-4 flex-shrink-0',
                               currentChat?.id === chat.id && 'text-primary',
@@ -350,7 +351,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                               aria-label="Renomear chat"
                               interactionType="icon-pulse"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
+                              <PencilSimple weight="duotone" className="w-3.5 h-3.5" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -362,7 +363,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                               aria-label="Remover chat"
                               interactionType="icon-pulse"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-error" />
+                              <Trash weight="duotone" className="w-3.5 h-3.5 text-error" />
                             </Button>
                           </motion.div>
                         </motion.button>
@@ -376,7 +377,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         transition={transitions.tweenFast}
                         className="flex items-center gap-2 px-3 py-2"
                       >
-                        <MessageSquare className="w-5 h-5 flex-shrink-0 text-green-500" />
+                        <Chat weight="duotone" className="w-5 h-5 flex-shrink-0 text-green-500" />
                         <input
                           type="text"
                           value={editValue}
@@ -407,7 +408,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 transition={transitions.smooth}
                 className="px-3 py-8 text-center text-textMuted"
               >
-                <FolderGit2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <Folder weight="duotone" className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">Nenhum projeto ainda</p>
                 <p className="text-xs mt-1">Clique em "Novo Projeto" para começar</p>
               </motion.div>
@@ -430,7 +431,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                           transition={transitions.tweenFast}
                           className="flex items-center gap-2 px-3 py-2"
                         >
-                          <FolderGit2 className="w-5 h-5 flex-shrink-0 text-primary" />
+                          <Folder weight="duotone" className="w-5 h-5 flex-shrink-0 text-primary" />
                           <input
                             type="text"
                             value={editValue}
@@ -473,7 +474,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                           }}
                         >
                           <AnimatedIcon isOpen={isExpanded} rotateAmount={90} className="w-4 h-4 flex-shrink-0">
-                            <FolderGit2 className="w-4 h-4" />
+                            <Folder weight="duotone" className="w-4 h-4" />
                           </AnimatedIcon>
                           <div className="flex-1 min-w-0 truncate flex items-center gap-2">
                             <span className="font-medium truncate">{project.name}</span>
@@ -505,7 +506,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                               aria-label="Renomear projeto"
                               interactionType="icon-pulse"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <PencilSimple weight="duotone" className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -517,7 +518,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                               aria-label="Remover projeto"
                               interactionType="icon-pulse"
                             >
-                              <Trash2 className="w-4 h-4 text-error" />
+                              <Trash weight="duotone" className="w-4 h-4 text-error" />
                             </Button>
                           </motion.div>
                         </motion.button>
@@ -549,7 +550,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                     setCurrentChat(chat)
                                   }}
                                 >
-                                  <Plus className="w-4 h-4" />
+                                  <Plus weight="bold" className="w-4 h-4" />
                                   <span>Novo Chat</span>
                                 </Button>
                               </StaggerItem>
@@ -576,7 +577,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                           startEditChat(chat.id, chat.title)
                                         }}
                                       >
-                                        <MessageSquare
+                                        <Chat
+                                          weight="duotone"
                                           className={cn(
                                             'w-4 h-4 flex-shrink-0',
                                             currentChat?.id === chat.id && 'text-primary',
@@ -602,7 +604,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                             aria-label="Renomear chat"
                                             interactionType="icon-pulse"
                                           >
-                                            <Edit2 className="w-3.5 h-3.5" />
+                                            <PencilSimple weight="duotone" className="w-3.5 h-3.5" />
                                           </Button>
                                           <Button
                                             variant="ghost"
@@ -615,7 +617,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                             aria-label="Remover chat"
                                             interactionType="icon-pulse"
                                           >
-                                            <Trash2 className="w-3.5 h-3.5 text-error" />
+                                            <Trash weight="duotone" className="w-3.5 h-3.5 text-error" />
                                           </Button>
                                         </motion.div>
                                       </motion.button>
@@ -641,7 +643,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                           >
                             <span>{projectChats.length} chat{projectChats.length > 1 ? 's' : ''}</span>
                             <AnimatedIcon isOpen={isExpanded} rotateAmount={90}>
-                              <ChevronRight className="w-4 h-4" />
+                              <CaretRight weight="bold" className="w-4 h-4" />
                             </AnimatedIcon>
                           </Button>
                         </StaggerItem>
@@ -661,7 +663,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             className="px-3 py-3 border-t border-border"
           >
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surfaceHover">
-              <MessageSquare className="w-4 h-4 text-textMuted" />
+              <Chat weight="duotone" className="w-4 h-4 text-textMuted" />
               <span className="text-sm text-textSecondary flex-1">
                 {chats.length} chat{chats.length !== 1 ? 's' : ''} no total
               </span>

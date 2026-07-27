@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store/infinyStore'
 import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
+import { EXTERNAL_LINK_EVENT } from '@/components/ui/LinkWarningDialog'
 import {
   chatMessageVariants,
   chatMessageStreamingVariants,
@@ -82,12 +83,22 @@ const renderers = {
   },
   a({ node, children, ...props }: any) {
     const href = node.url
+    const isExternal = typeof href === 'string' && /^https?:\/\//i.test(href)
+
+    const handleClick = (e: any) => {
+      if (isExternal) {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent(EXTERNAL_LINK_EVENT, { detail: { url: href } }))
+      }
+    }
+
     return (
       <motion.a
         {...props}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         className="text-primary hover:underline inline-flex items-center gap-1"
         whileHover={{ x: 2, transition: transitions.snappy }}
         whileTap={{ scale: 0.98, transition: transitions.tweenFast }}
@@ -245,7 +256,7 @@ export function Message({ message, isStreaming = false }: MessageProps) {
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
           transition={transitions.bouncy}
         >
-          <img src={turtlyImg} alt="Turtly" className="w-5 h-5 object-contain" />
+          <img src={turtlyImg} alt="Turtly" className="w-6 h-6 object-contain" />
         </motion.div>
       )}
 
