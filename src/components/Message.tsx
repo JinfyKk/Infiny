@@ -4,10 +4,11 @@ import rehypeHighlight from 'rehype-highlight'
 import { Copy, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/infinyStore'
 import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
 import { EXTERNAL_LINK_EVENT } from '@/components/ui/LinkWarningDialog'
+import { TURTLY_WAITING_PHRASES } from '@/lib/turtlyWaitingPhrases'
 import {
   chatMessageVariants,
   chatMessageStreamingVariants,
@@ -132,14 +133,8 @@ function TypingIndicator() {
 
 const allMessages = useMemo(
   () => [
-    '🐢 ajustando o casco e preparando a resposta...',
-    '🐢 procurando a resposta perfeita...',
-    '🐢 lendo milhões de possibilidades...',
-    '🐢 atravessando a floresta de possibilidades...',
-    '🐢 vencendo a corrida contra o coelho...',
-    '🐢 pedindo ajuda a amigos tartarugas...',
+    ...TURTLY_WAITING_PHRASES,
     `🐢 perguntando pro ${providerLabel}...`,
-    '🐢 levando a resposta até você...',
   ],
   [providerLabel]
 )
@@ -227,6 +222,39 @@ export function Message({ message, isStreaming = false }: MessageProps) {
   const isAssistant = message.role === 'assistant'
   const streaming = isStreaming || message.isStreaming
 
+  // Efeito de "digitação": a mensagem nasceu em streaming? então revela o
+  // texto aos poucos até alcançar o conteúdo já recebido, em vez de jogar
+  // tudo na tela de uma vez. Mensagens carregadas do histórico (que nunca
+  // passaram por streaming) aparecem inteiras, sem animação.
+  const everStreamedRef = useRef(streaming)
+  const [displayedLength, setDisplayedLength] = useState(
+    everStreamedRef.current ? 0 : message.content.length
+  )
+
+  useEffect(() => {
+    if (!everStreamedRef.current) return
+    const target = message.content.length
+    if (displayedLength >= target) return
+
+    const frame = requestAnimationFrame(() => {
+      setDisplayedLength((prev) => {
+        const gap = target - prev
+        // avança uma fração do que falta a cada frame, com um mínimo de
+        // 1 caractere — assim resposta grande "acelera" a digitação e
+        // resposta curta não fica lenta demais
+        const step = Math.max(gap * 0.08, 1)
+        return Math.min(target, prev + step)
+      })
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [displayedLength, message.content])
+
+  const displayedContent = everStreamedRef.current
+    ? message.content.slice(0, Math.floor(displayedLength))
+    : message.content
+  const isTyping = everStreamedRef.current && displayedLength < message.content.length
+
   const timestamp = new Date().toISOString()
   console.log(`[SEND 33] [${timestamp}] [renderer] Message RENDER`, {
     messageId: message.id,
@@ -299,13 +327,23 @@ export function Message({ message, isStreaming = false }: MessageProps) {
           {streaming && !message.content ? (
             <TypingIndicator />
           ) : (
-            <ReactMarkdown
-              components={renderers}
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown
+                components={renderers}
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+              >
+                {displayedContent}
+              </ReactMarkdown>
+              {isTyping && (
+                <motion.span
+                  className="inline-block w-[2px] h-4 -mb-0.5 bg-textMuted align-middle"
+                  animate={{ opacity: [1, 0] }}
+                  transition={{ duration: 0.8, repeat: Infinity, repeatType: 'reverse' }}
+                  aria-hidden="true"
+                />
+              )}
+            </>
           )}
         </motion.div>
       </div>

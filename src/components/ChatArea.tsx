@@ -8,11 +8,12 @@ import { Message } from './Message'
 import { ModelSelector } from './ModelSelector'
 import { EffortSelector } from './EffortSelector'
 import { ProviderSelector } from './ProviderSelector'
-import turtlyImg from '@/assets/Gemini_Generated_Image_xev09dxev09dxev0-removebg-preview.png'
+import { TurtlyEasterEgg } from './TurtlyEasterEgg'
 import { ThemeSelector } from '@/theme/ThemeSelector'
 import { motion, AnimatePresence } from 'framer-motion'
 import { transitions } from '@/lib/transitions'
 import { StaggerContainer, StaggerItem } from '@/components/ui/AnimatedComponents'
+import { TURTLY_WAITING_PHRASES } from '@/lib/turtlyWaitingPhrases'
 
 interface ChatAreaProps {
   isFilesPanelOpen: boolean
@@ -41,6 +42,27 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
 
   // Per-chat generating state
   const isGenerating = currentChat ? isChatGenerating(currentChat.id) : false
+
+  // Enquanto a IA está respondendo, o placeholder do input vai trocando
+  // entre as frases brincalhonas da Turtly em vez de ficar parado num
+  // texto único
+  const [waitingPlaceholder, setWaitingPlaceholder] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setWaitingPlaceholder(null)
+      return
+    }
+
+    const pickPhrase = () => {
+      const phrase = TURTLY_WAITING_PHRASES[Math.floor(Math.random() * TURTLY_WAITING_PHRASES.length)]
+      setWaitingPlaceholder(phrase)
+    }
+
+    pickPhrase()
+    const interval = setInterval(pickPhrase, 3200 + Math.random() * 1600)
+    return () => clearInterval(interval)
+  }, [isGenerating])
 
   // Carregar modelos do provider ativo
   const loadModels = useCallback(async () => {
@@ -178,9 +200,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
       <div className="flex-1 flex flex-col bg-background overflow-hidden">
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center max-w-md mx-auto">
-            <div className="w-28 h-28 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <img src={turtlyImg} alt="Turtly" className="w-20 h-20 object-contain" />
-            </div>
+            <TurtlyEasterEgg />
             <h2 className="text-2xl font-medium text-text mb-3">Bem-vindo ao Infiny</h2>
             <p className="text-textSecondary mb-6 leading-relaxed">
               Selecione ou crie um projeto na barra lateral para começar a conversar.
@@ -396,7 +416,7 @@ export function ChatArea({ isFilesPanelOpen, onToggleFilesPanel }: ChatAreaProps
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={isGenerating ? 'IA está respondendo...' : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
+              placeholder={isGenerating ? (waitingPlaceholder ?? 'IA está respondendo...') : 'Digite sua mensagem... (Shift+Enter para nova linha)'}
               disabled={isGenerating}
               minRows={1}
               maxRows={8}
